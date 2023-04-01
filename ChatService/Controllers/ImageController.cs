@@ -1,6 +1,7 @@
 using ChatService.Dtos;
 using ChatService.Storage;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Azure.Cosmos;
 
 
 namespace ChatService.Controllers;
@@ -19,30 +20,31 @@ public class ImageController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<UploadImageResponse>> UploadImage([FromForm] UploadImageRequest uploadImageRequest)
     {
-        if (uploadImageRequest.File.Length == 0)
+        try
         {
-            return BadRequest("Image file is empty");
+            var imageId = await _profilePictureStorage.UploadImage(uploadImageRequest.File.OpenReadStream());
+            return Ok(new UploadImageResponse(imageId));
         }
-        var imageId = await _profilePictureStorage.UploadImage(uploadImageRequest.File.OpenReadStream());
-        return Ok(new UploadImageResponse(imageId));
+        catch (ArgumentException)
+        {
+            return BadRequest("The Image file provided is empty");
+        }
     }
 
     [HttpGet("{id}")]
-    public async Task<ActionResult> DownloadImage(string id)
+    public async Task<ActionResult> DownloadImage([FromRoute] string id)
     {
-        if (String.IsNullOrWhiteSpace(id))
-        {
-            return BadRequest("The ID provided contains no text");
-        }
         var imageData = await _profilePictureStorage.DownloadImage(id);
+        
         if (imageData == null)
         {
             return NotFound($"The image with id {id} was not found");
         }
-        
-        var memoryStream = new MemoryStream();
-        await imageData.CopyToAsync(memoryStream);
-        memoryStream.Position = 0;
-        return Ok(new FileContentResult(memoryStream.ToArray(), "image/jpeg"));
+    
+        var imageMemoryStream = new MemoryStream();
+        await imageData.CopyToAsync(imageMemoryStream);
+        imageMemoryStream.Position = 0;
+        //return Ok(imageMemoryStream);
+        return Ok(new FileContentResult(imageMemoryStream.ToArray(), "image/jpeg"));
     }
 }

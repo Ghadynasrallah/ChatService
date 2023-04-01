@@ -1,3 +1,4 @@
+using System.Drawing;
 using System.Net;
 using ChatService.Dtos;
 using ChatService.Storage;
@@ -56,6 +57,7 @@ public class ImageControllerTest : IClassFixture<WebApplicationFactory<Program>>
     public async Task DownloadValidImage()
     {
         var guid = Guid.NewGuid().ToString();
+        ImageStream.Position = 0;
         _profilePictureStorageMock.Setup(m => m.DownloadImage(guid))
             .ReturnsAsync(ImageStream);
 
@@ -63,11 +65,20 @@ public class ImageControllerTest : IClassFixture<WebApplicationFactory<Program>>
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         _profilePictureStorageMock.Verify(m =>m.DownloadImage(guid));
-
+        
         var responseContent = new FileContentResult(await response.Content.ReadAsByteArrayAsync(), "image/jpeg");
         var expectedContent = new FileContentResult(ImageStream.ToArray(), "image/jpeg");
-
-        Assert.Equal(responseContent, expectedContent);
+        
+        Assert.Equal(expectedContent.FileContents, responseContent.FileContents);
+        
+        /*
+         //Only if the controller returns the ImageStream as is
+        var outputStream = response.Content.ReadAsStream();
+        var OutputMemoryStream = new MemoryStream();
+        outputStream.CopyTo(OutputMemoryStream);
+        Assert.Equal(ImageStream.ToArray(), OutputMemoryStream.ToArray());
+        */
+        
     }
 
     [Fact]

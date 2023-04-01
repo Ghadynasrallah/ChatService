@@ -1,7 +1,5 @@
-using System.Runtime.InteropServices.ComTypes;
 using Azure.Storage.Blobs;
-using ChatService.Dtos;
-using Microsoft.Azure.Storage.Blob;
+using Stream = System.IO.Stream;
 
 namespace ChatService.Storage;
 
@@ -36,7 +34,13 @@ public class CloudBlobProfilePictureStorage : IProfilePictureStorage
 
     public async Task<Stream?> DownloadImage(string profilePictureId)
     {
+        if (String.IsNullOrWhiteSpace(profilePictureId))
+        {
+            throw new ArgumentException("The profile picture ID is invalid: ID does not contain any text");
+        }
+        
         BlobClient blobClient = _blobContainerClient.GetBlobClient(profilePictureId);
+
         if (! await blobClient.ExistsAsync())
         {
             return null;
@@ -51,6 +55,10 @@ public class CloudBlobProfilePictureStorage : IProfilePictureStorage
 
     public async Task DeleteImage(string profilePictureId)
     {
+        if (String.IsNullOrWhiteSpace(profilePictureId))
+        {
+            throw new ArgumentException("The profile picture ID is invalid: ID does not contain any text");
+        }
         BlobClient blobClient = _blobContainerClient.GetBlobClient(profilePictureId);
         await blobClient.DeleteIfExistsAsync();
     }

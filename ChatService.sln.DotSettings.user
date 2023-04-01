@@ -1,5 +1,5 @@
 ﻿<wpf:ResourceDictionary xml:space="preserve" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:s="clr-namespace:System;assembly=mscorlib" xmlns:ss="urn:shemas-jetbrains-com:settings-storage-xaml" xmlns:wpf="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
-	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=01c3e76b_002D5ce1_002D4ff8_002D837f_002Dbd6f2b2fd914/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" IsActive="True" Name="UploadValidImage" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;
+	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=01c3e76b_002D5ce1_002D4ff8_002D837f_002Dbd6f2b2fd914/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" Name="UploadValidImage" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;
   &lt;TestAncestor&gt;
     &lt;TestId&gt;xUnit::252F874B-3A9F-496E-9CCA-BB9EF722273A::net6.0::ChatService.Tests.ImageControllerTest&lt;/TestId&gt;
     &lt;TestId&gt;xUnit::F4427AE0-442B-4C62-B41B-7CF2F63D3C15::net6.0::ChatService.Integrationtests.CloudBlobProfilePictureStorageTest.UploadAndDownloadValidImage&lt;/TestId&gt;
@@ -15,10 +15,13 @@
     &lt;TestId&gt;xUnit::252F874B-3A9F-496E-9CCA-BB9EF722273A::net6.0::ChatService.Tests.UserControllerTest&lt;/TestId&gt;
   &lt;/TestAncestor&gt;
 &lt;/SessionState&gt;</s:String>
-	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=55c357f3_002Daa84_002D4426_002Db729_002Dc4af6302f2fa/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" Name="DownloadNonValidImage" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;
+	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=55c357f3_002Daa84_002D4426_002Db729_002Dc4af6302f2fa/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" IsActive="True" Name="DownloadNonValidImage" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;
   &lt;TestAncestor&gt;
     &lt;TestId&gt;xUnit::252F874B-3A9F-496E-9CCA-BB9EF722273A::net6.0::ChatService.Tests.ImageControllerTest.DownloadNonValidImage&lt;/TestId&gt;
     &lt;TestId&gt;xUnit::F4427AE0-442B-4C62-B41B-7CF2F63D3C15::net6.0::ChatService.Integrationtests.CloudBlobProfilePictureStorageTest&lt;/TestId&gt;
+    &lt;TestId&gt;xUnit::F4427AE0-442B-4C62-B41B-7CF2F63D3C15::net6.0::ChatService.Integrationtests.CosmosProfileStorageTest&lt;/TestId&gt;
+    &lt;TestId&gt;xUnit::252F874B-3A9F-496E-9CCA-BB9EF722273A::net6.0::ChatService.Tests.UserControllerTest&lt;/TestId&gt;
+    &lt;TestId&gt;xUnit::252F874B-3A9F-496E-9CCA-BB9EF722273A::net6.0::ChatService.Tests.ImageControllerTest&lt;/TestId&gt;
   &lt;/TestAncestor&gt;
 &lt;/SessionState&gt;</s:String>
 	
