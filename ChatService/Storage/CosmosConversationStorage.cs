@@ -15,7 +15,7 @@ public class CosmosConversationStorage
     }
 
     private Container container => _cosmosClient.GetDatabase("ChatService").GetContainer("Conversations");
-
+    
     public async Task<List<Conversation>?> EnumerateConversationsForAGivenUser(string userId)
     {
         try
@@ -113,7 +113,7 @@ public class CosmosConversationStorage
                     ConsistencyLevel = ConsistencyLevel.Session
                 });
             await container.DeleteItemAsync<ConversationEntity>(
-                id: conversationId,
+                id: $"{userId2}_{userId1}",
                 partitionKey: new PartitionKey(userId2),
                 new ItemRequestOptions
                 {
@@ -147,7 +147,7 @@ public class CosmosConversationStorage
     
     private static ConversationEntity ToConversationEntityForUser2(Conversation conversation)
     {
-        return new ConversationEntity(conversation.userId1, $"{conversation.userId1}_{conversation.userId2}",
-            conversation.userId1, conversation.userId2, conversation.lastModifiedUnixTime);
+        return new ConversationEntity(conversation.userId1, $"{conversation.userId2}_{conversation.userId1}",
+            conversation.userId2, conversation.userId1, conversation.lastModifiedUnixTime);
     } 
 }
