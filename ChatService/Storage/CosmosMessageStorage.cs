@@ -59,7 +59,8 @@ public class CosmosMessageStorage
             throw new ArgumentException($"Invalid message {message}", nameof(message));
         }
 
-        await container.UpsertItemAsync(message);
+        await container.UpsertItemAsync(ToMessageEntityForFirstConversation(message));
+        await container.UpsertItemAsync(ToMessageEntityForSecondConversation(message));
     }
 
     public async Task<Message?> GetMessage(string conversationId, string messageId)
@@ -97,6 +98,13 @@ public class CosmosMessageStorage
                 {
                     ConsistencyLevel = ConsistencyLevel.Session
                 });
+            await container.DeleteItemAsync<MessageEntity>(
+                id: messageId,
+                partitionKey: new PartitionKey(FlipUsernamesInConversationId(conversationId)),
+                new ItemRequestOptions
+                {
+                    ConsistencyLevel = ConsistencyLevel.Session
+                });
             return true;
         }
         catch (CosmosException e)
@@ -113,9 +121,21 @@ public class CosmosMessageStorage
             messageEntity.partitionKey, messageEntity.unixTime);
     }
 
-    private static MessageEntity ToMessageEntity(Message message)
+    private static MessageEntity ToMessageEntityForFirstConversation(Message message)
     {
         return new MessageEntity(message.conversationId, message.messageId, message.text, message.senderUsername,
             message.unixTime);
+    }
+    
+    private static MessageEntity ToMessageEntityForSecondConversation(Message message)
+    {
+        return new MessageEntity(FlipUsernamesInConversationId(message.conversationId), message.messageId, message.text, message.senderUsername,
+            message.unixTime);
+    }
+
+    private static string FlipUsernamesInConversationId(string conversationId)
+    {
+        string[] userIds = conversationId.Split("_");
+        return $"{userIds[1]}_{userIds[0]}";
     }
 }
