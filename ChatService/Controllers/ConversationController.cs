@@ -22,23 +22,23 @@ public class ConversationController : ControllerBase
     [HttpPost("{conversationId}/messages")]
     public async Task<ActionResult<SendMessageResponse>> SendMessageToConversation([FromRoute] string conversationId, [FromBody] SendMessageRequest sendMessageRequest)
     {
+        var message = new Message(
+            sendMessageRequest.messageId,
+            sendMessageRequest.text,
+            sendMessageRequest.senderUsername,
+            conversationId,
+            DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+        );
         try
         {
-            var message = new Message(
-                Guid.NewGuid().ToString(),
-                sendMessageRequest.text,
-                sendMessageRequest.senderUsername,
-                conversationId,
-                DateTimeOffset.UtcNow.ToUnixTimeSeconds()
-            );
             _messageStorage.PostMessageToConversation(message);
-            return CreatedAtAction(nameof(EnumerateMessagesInAConversation), new {messageId = message.messageId, conversationId = message.conversationId });
+            return CreatedAtAction(nameof(EnumerateMessagesInAConversation),
+                                new {messageId = message.messageId, conversationId = message.conversationId },
+                                     new SendMessageResponse(message.unixTime));
         }
-        catch (CosmosException e)
+        catch (ArgumentException)
         {
-            if (e.StatusCode == HttpStatusCode.NotFound)
-                return NotFound($"There exists no message with message ID {sendMessageRequest.messageId} in conversation {conversationId}");
-            throw;
+            return BadRequest($"Invalid message arguments {message}");
         }
     }
 
@@ -51,5 +51,67 @@ public class ConversationController : ControllerBase
             return NotFound($"There exists no conversation with conversation ID {conversationId}");
         }
         return Ok(new EnumerateMessagesInAConversationResponseDto(messages));
+    }
+
+    [HttpPost]
+    public async Task<ActionResult<StartConversationResponseDto>> StartConversation(
+        [FromBody] StartConversationRequestDto startConversationRequestDto)
+    {
+        string userId1 = startConversationRequestDto.userId1;
+        string userId2 = startConversationRequestDto.userId2;
+        var sendMessageRequest = startConversationRequestDto.sendMessageRequest;
+        
+        var conversation = new Conversation($"{userId1}_{userId2}", userId1, userId2,
+            DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        var message = new Message(
+            sendMessageRequest.messageId,
+            sendMessageRequest.text,
+            sendMessageRequest.senderUsername,
+            conversation.conversationId,
+            conversation.lastModifiedUnixTime
+        );
+
+        try
+        {
+            await _conversationStorage.PostConversation(conversation);
+            bool sendFirstMessage = await sendFirstMessageWhenStartingAConversation(message);
+            if (!sendFirstMessage)
+            {
+                return BadRequest($"Invalid message arguments {message}");
+            }
+            var startConversationResponse = new StartConversationResponseDto(conversation.conversationId, conversation.lastModifiedUnixTime);
+            return CreatedAtAction(nameof(EnumerateConversationsOfAGivenUser), 
+                                new { conversationId = conversation.conversationId },
+                                startConversationResponse);
+        }
+        catch (ArgumentException)
+        {
+            return BadRequest($"Invalid start conversation request arguments {conversation}");
+        }
+    }
+
+    [HttpGet]
+    public async Task<ActionResult<EnumerateConversationsOfAGivenUserDto>> EnumerateConversationsOfAGivenUser([FromQuery] string userId) 
+    {
+        List<Conversation> conversations = await _conversationStorage.EnumerateConversationsForAGivenUser(userId);
+        if (conversations == null)
+        {
+            return NotFound($"There exists no user with user ID {userId}");
+        }
+
+        return Ok(new EnumerateConversationsOfAGivenUserDto(conversations, null));
+    }
+
+    private async Task<bool> sendFirstMessageWhenStartingAConversation(Message message)
+    {
+        try
+        {
+            await _messageStorage.PostMessageToConversation(message);
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
     }
 }
