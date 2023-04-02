@@ -5,7 +5,7 @@ using Microsoft.Azure.Cosmos;
 
 namespace ChatService.Storage;
 
-public class CosmosConversationStorage
+public class CosmosConversationStorage : IConversationStorage
 {
     private readonly CosmosClient _cosmosClient;
     
