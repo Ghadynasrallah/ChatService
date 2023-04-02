@@ -62,6 +62,51 @@ public class CosmosMessageStorage
         await container.UpsertItemAsync(message);
     }
 
+    public async Task<Message?> GetMessage(string conversationId, string messageId)
+    {
+        try
+        {
+            var messageEntity = await container.ReadItemAsync<MessageEntity>(
+                id: messageId,
+                partitionKey: new PartitionKey(conversationId),
+                new ItemRequestOptions
+                {
+                    ConsistencyLevel = ConsistencyLevel.Session
+                });
+            return ToMessage(messageEntity);
+        }
+        catch (CosmosException e)
+        {
+            if (e.StatusCode == HttpStatusCode.NotFound)
+            {
+                return null;
+            }
+
+            throw;
+        }
+    }
+
+    public async Task<bool> DeleteMessage(string conversationId, string messageId)
+    {
+        try
+        {
+            await container.DeleteItemAsync<MessageEntity>(
+                id: messageId,
+                partitionKey: new PartitionKey(conversationId),
+                new ItemRequestOptions
+                {
+                    ConsistencyLevel = ConsistencyLevel.Session
+                });
+            return true;
+        }
+        catch (CosmosException e)
+        {
+            if (e.StatusCode == HttpStatusCode.NotFound)
+                return false;
+            throw;
+        }
+    }
+
     private static Message ToMessage(MessageEntity messageEntity)
     {
         return new Message(messageEntity.id, messageEntity.text, messageEntity.senderUsername,
