@@ -61,6 +61,78 @@ public class CosmosConversationStorage
         await container.UpsertItemAsync(ToConversationEntityForUser2(conversation));
     }
 
+    public async Task<Conversation?> GetConversation(string conversationId)
+    {
+        if (String.IsNullOrWhiteSpace(conversationId))
+        {
+            throw new ArgumentException("Invalid conversation ID: ID does not contain any text");
+        }
+
+        try
+        {
+            string[] parts = conversationId.Split("_");
+            string userId1 = parts[0];
+            var conversationEntity = await container.ReadItemAsync<ConversationEntity>(
+                id: conversationId,
+                partitionKey: new PartitionKey(userId1),
+                new ItemRequestOptions
+                {
+                    ConsistencyLevel = ConsistencyLevel.Session
+                }
+            );
+            return ToConversation(conversationEntity);
+        }
+        catch (CosmosException e)
+        {
+            if (e.StatusCode == HttpStatusCode.NotFound)
+            {
+                return null;
+            }
+
+            throw;
+        }
+    }
+
+    public async Task<bool> DeleteConversation(string conversationId)
+    {
+        if (String.IsNullOrWhiteSpace(conversationId))
+        {
+            throw new ArgumentException("Invalid conversation ID: ID does not contain any text");
+        }
+
+        try
+        {
+            string[] parts = conversationId.Split("_");
+            string userId1 = parts[0];
+            string userId2 = parts[1];
+            await container.DeleteItemAsync<ConversationEntity>(
+                id: conversationId,
+                partitionKey: new PartitionKey(userId1),
+                new ItemRequestOptions
+                {
+                    ConsistencyLevel = ConsistencyLevel.Session
+                });
+            await container.DeleteItemAsync<ConversationEntity>(
+                id: conversationId,
+                partitionKey: new PartitionKey(userId2),
+                new ItemRequestOptions
+                {
+                    ConsistencyLevel = ConsistencyLevel.Session
+                });
+            return true;
+        }
+        catch (CosmosException e)
+        {
+            if (e.StatusCode == HttpStatusCode.NotFound)
+            {
+                return false;
+            }
+
+            throw;
+        }
+    }
+    
+    
     private static Conversation ToConversation(ConversationEntity conversationEntity)
     {
         return new Conversation(conversationEntity.id, conversationEntity.userId1, conversationEntity.userId2,
