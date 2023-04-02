@@ -147,7 +147,7 @@ public class CosmosConversationStorage : IConversationStorage
     
     private static ConversationEntity ToConversationEntityForUser2(Conversation conversation)
     {
-        return new ConversationEntity(conversation.userId1, $"{conversation.userId2}_{conversation.userId1}",
+        return new ConversationEntity(conversation.userId2, $"{conversation.userId2}_{conversation.userId1}",
             conversation.userId2, conversation.userId1, conversation.lastModifiedUnixTime);
     } 
 }
