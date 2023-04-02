@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "8lGjPSQbGd7rZIt7pJ/FKzCTr1bv9ivq2D/dMpr0UID3SK9UIm1o/W+VteaXS7QdHZdGT4EmD7WvkQMNbPwxug==",
+  "dgSpecHash": "Fq8MzlJXgjKs1CIzacfc0DgOw+EKJlIudcj73d4ujTtpC3lXtX9agggJHxOdQtFzCYJ32hHgaRTvmA7wRQ+Mxw==",
   "success": true,
   "projectFilePath": "/Users/ghady/RiderProjects/ChatService/ChatService.IntegrationTests/ChatService.IntegrationTests.csproj",
   "expectedPackageFiles": [
@@ -59,6 +59,7 @@
     "/Users/ghady/.nuget/packages/netstandard.library/2.0.3/netstandard.library.2.0.3.nupkg.sha512",
     "/Users/ghady/.nuget/packages/newtonsoft.json/10.0.2/newtonsoft.json.10.0.2.nupkg.sha512",
     "/Users/ghady/.nuget/packages/nuget.frameworks/5.11.0/nuget.frameworks.5.11.0.nupkg.sha512",
+    "/Users/ghady/.nuget/packages/nunit/3.13.3/nunit.3.13.3.nupkg.sha512",
     "/Users/ghady/.nuget/packages/portable.bouncycastle/1.9.0/portable.bouncycastle.1.9.0.nupkg.sha512",
     "/Users/ghady/.nuget/packages/swashbuckle.aspnetcore.swagger/6.5.0/swashbuckle.aspnetcore.swagger.6.5.0.nupkg.sha512",
     "/Users/ghady/.nuget/packages/swashbuckle.aspnetcore.swaggergen/6.5.0/swashbuckle.aspnetcore.swaggergen.6.5.0.nupkg.sha512",

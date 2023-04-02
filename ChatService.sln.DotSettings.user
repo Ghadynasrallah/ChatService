@@ -4,6 +4,8 @@
     &lt;TestId&gt;xUnit::252F874B-3A9F-496E-9CCA-BB9EF722273A::net6.0::ChatService.Tests.ImageControllerTest&lt;/TestId&gt;
     &lt;TestId&gt;xUnit::F4427AE0-442B-4C62-B41B-7CF2F63D3C15::net6.0::ChatService.Integrationtests.CloudBlobProfilePictureStorageTest.UploadAndDownloadValidImage&lt;/TestId&gt;
     &lt;TestId&gt;xUnit::F4427AE0-442B-4C62-B41B-7CF2F63D3C15::net6.0::ChatService.Integrationtests.CloudBlobProfilePictureStorageTest&lt;/TestId&gt;
+    &lt;TestId&gt;xUnit::F4427AE0-442B-4C62-B41B-7CF2F63D3C15::net6.0::ChatService.Integrationtests.CosmosConversationStorageTest.GetAlreadyExistingConversation&lt;/TestId&gt;
+    &lt;TestId&gt;xUnit::F4427AE0-442B-4C62-B41B-7CF2F63D3C15::net6.0::ChatService.Integrationtests.CosmosConversationStorageTest&lt;/TestId&gt;
   &lt;/TestAncestor&gt;
 &lt;/SessionState&gt;</s:String>
 	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=0d702b97_002Da34d_002D4a49_002D97d0_002D6fd5a64d9488/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" Name="CosmosProfileStorageTest" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;
@@ -22,6 +24,9 @@
     &lt;TestId&gt;xUnit::F4427AE0-442B-4C62-B41B-7CF2F63D3C15::net6.0::ChatService.Integrationtests.CosmosProfileStorageTest&lt;/TestId&gt;
     &lt;TestId&gt;xUnit::252F874B-3A9F-496E-9CCA-BB9EF722273A::net6.0::ChatService.Tests.UserControllerTest&lt;/TestId&gt;
     &lt;TestId&gt;xUnit::252F874B-3A9F-496E-9CCA-BB9EF722273A::net6.0::ChatService.Tests.ImageControllerTest&lt;/TestId&gt;
+    &lt;TestId&gt;xUnit::F4427AE0-442B-4C62-B41B-7CF2F63D3C15::net6.0::ChatService.Integrationtests.CosmosConversationStorageTest&lt;/TestId&gt;
+    &lt;TestId&gt;xUnit::F4427AE0-442B-4C62-B41B-7CF2F63D3C15::net6.0::ChatService.Integrationtests.CosmosMessageStorageTest&lt;/TestId&gt;
+    &lt;TestId&gt;xUnit::252F874B-3A9F-496E-9CCA-BB9EF722273A::net6.0::ChatService.Tests.ConversationControllerTest&lt;/TestId&gt;
   &lt;/TestAncestor&gt;
 &lt;/SessionState&gt;</s:String>
 	
@@ -32,5 +37,12 @@
     &lt;TestId&gt;xUnit::252F874B-3A9F-496E-9CCA-BB9EF722273A::net6.0::ChatService.Tests.UserControllerTest&lt;/TestId&gt;
     &lt;TestId&gt;xUnit::F4427AE0-442B-4C62-B41B-7CF2F63D3C15::net6.0::ChatService.Integrationtests.CloudBlobProfilePictureStorageTest&lt;/TestId&gt;
     &lt;TestId&gt;xUnit::F4427AE0-442B-4C62-B41B-7CF2F63D3C15::net6.0::ChatService.Integrationtests.CosmosProfileStorageTest&lt;/TestId&gt;
+  &lt;/TestAncestor&gt;
+&lt;/SessionState&gt;</s:String>
+	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=f37bd572_002D475f_002D4393_002Db82e_002D70c6fcf71a4f/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" Name="DeleteExistingConversation" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;
+  &lt;TestAncestor&gt;
+    &lt;TestId&gt;xUnit::F4427AE0-442B-4C62-B41B-7CF2F63D3C15::net6.0::ChatService.Integrationtests.CosmosConversationStorageTest&lt;/TestId&gt;
+    &lt;TestId&gt;xUnit::F4427AE0-442B-4C62-B41B-7CF2F63D3C15::net6.0::ChatService.Integrationtests.CosmosMessageStorageTest&lt;/TestId&gt;
+    &lt;TestId&gt;xUnit::252F874B-3A9F-496E-9CCA-BB9EF722273A::net6.0::ChatService.Tests.ConversationControllerTest&lt;/TestId&gt;
   &lt;/TestAncestor&gt;
 &lt;/SessionState&gt;</s:String></wpf:ResourceDictionary>
