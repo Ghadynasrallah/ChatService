@@ -60,7 +60,7 @@ public class ConversationController : ControllerBase
         string userId1 = startConversationRequestDto.userId1;
         string userId2 = startConversationRequestDto.userId2;
         var sendMessageRequest = startConversationRequestDto.sendMessageRequest;
-        
+
         var conversation = new Conversation($"{userId1}_{userId2}", userId1, userId2,
             DateTimeOffset.UtcNow.ToUnixTimeSeconds());
         var message = new Message(
@@ -71,6 +71,11 @@ public class ConversationController : ControllerBase
             conversation.lastModifiedUnixTime
         );
 
+        if (await _conversationStorage.GetConversation(conversation.conversationId) != null)
+        {
+            return Conflict($"There already exists a conversation between {userId1} and {userId1}");
+        }
+        
         try
         {
             await _conversationStorage.PostConversation(conversation);
