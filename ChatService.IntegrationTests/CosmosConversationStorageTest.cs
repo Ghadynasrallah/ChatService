@@ -7,12 +7,12 @@ using Assert = Xunit.Assert;
 
 namespace ChatService.Integrationtests;
 
-public class CosmosConversationStorageTest :  IClassFixture<WebApplicationFactory<Program>>
+public class CosmosConversationStorageTest :  IClassFixture<WebApplicationFactory<Program>>, IAsyncLifetime
 {
     private readonly IConversationStorage _store;
 
     private readonly Conversation _conversation1 = new Conversation("john_ripper", "john", "ripper", 100000);
-    private readonly Conversation _conversation1flipped = new Conversation("ripper_john", "ripper", "john", 100000);
+    private readonly Conversation _conversation1Flipped = new Conversation("ripper_john", "ripper", "john", 100000);
     private readonly Conversation _conversation2 = new Conversation("mike_john", "mike", "john", 100200);
     private readonly Conversation _conversation3 = new Conversation("ripper_mike", "ripper", "mike", 100010);
 
@@ -38,7 +38,7 @@ public class CosmosConversationStorageTest :  IClassFixture<WebApplicationFactor
     {
         await _store.PostConversation(_conversation1);
         Assert.Equal(_conversation1, await _store.GetConversation(_conversation1.conversationId));
-        Assert.Equal(_conversation1flipped, await _store.GetConversation(_conversation1flipped.conversationId));
+        Assert.Equal(_conversation1Flipped, await _store.GetConversation(_conversation1Flipped.conversationId));
     }
 
     [Xunit.Theory]
@@ -76,7 +76,7 @@ public class CosmosConversationStorageTest :  IClassFixture<WebApplicationFactor
         await _store.PostConversation(_conversation1);
         Assert.True(await _store.DeleteConversation(_conversation1.conversationId));
         Assert.Null(await _store.GetConversation(_conversation1.conversationId));
-        Assert.Null(await _store.GetConversation(_conversation1flipped.conversationId));
+        Assert.Null(await _store.GetConversation(_conversation1Flipped.conversationId));
     }
 
     [Fact]
