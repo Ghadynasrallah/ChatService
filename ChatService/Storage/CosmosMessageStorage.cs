@@ -5,7 +5,7 @@ using Microsoft.Azure.Cosmos;
 
 namespace ChatService.Storage;
 
-public class CosmosMessageStorage
+public class CosmosMessageStorage : IMessageStorage
 {
     private readonly CosmosClient _cosmosClient;
 
@@ -16,7 +16,7 @@ public class CosmosMessageStorage
 
     private Container container => _cosmosClient.GetDatabase("ChatService").GetContainer("Messages");
     
-    public async Task<List<Message>?> EnumerateMessagesForAGivenConversation(string conversationId)
+    public async Task<List<Message>?> EnumerateMessagesFromAGivenConversation(string conversationId)
     {
         try
         {
@@ -48,6 +48,7 @@ public class CosmosMessageStorage
             throw;
         }
     }
+    
 
     public async Task PostMessageToConversation(Message message)
     {
