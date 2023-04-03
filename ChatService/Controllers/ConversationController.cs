@@ -43,14 +43,17 @@ public class ConversationController : ControllerBase
     }
 
     [HttpGet("{conversationId}/messages")]
-    public async Task<ActionResult<EnumerateMessagesInAConversationResponseDto>> EnumerateMessagesInAConversation([FromRoute] string conversationId)
+    public async Task<ActionResult<EnumerateMessagesInAConversationResponseDto>> EnumerateMessagesInAConversation([FromRoute] string conversationId,
+        [FromQuery] string? continuationToken = null,
+        [FromQuery] int? limit = null,
+        [FromQuery] long? lastSeenMessageTime = null)
     {
-        List<Message> messages = await _messageStorage.EnumerateMessagesFromAGivenConversation(conversationId);
-        if (messages == null)
+        var response = await _messageStorage.EnumerateMessagesFromAGivenConversation(conversationId, continuationToken, limit, lastSeenMessageTime);
+        if (response == null)
         {
             return NotFound($"There exists no conversation with conversation ID {conversationId}");
         }
-        return Ok(new EnumerateMessagesInAConversationResponseDto(messages));
+        return Ok(response);
     }
 
     [HttpPost]

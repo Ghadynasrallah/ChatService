@@ -110,7 +110,7 @@ public class CosmosMessageStorageTest : IClassFixture<WebApplicationFactory<Prog
         var realMessagesForFoo = await _store.EnumerateMessagesFromAGivenConversation("foo_mike");
         var realMessagesForMike = await _store.EnumerateMessagesFromAGivenConversation("mike_foo");
         
-        CollectionAssert.AreEquivalent(expectedMessagesForFoo, realMessagesForFoo); 
-        CollectionAssert.AreEquivalent(expectedMessagesForMike, realMessagesForMike); 
+        CollectionAssert.AreEquivalent(expectedMessagesForFoo, realMessagesForFoo.messages); 
+        CollectionAssert.AreEquivalent(expectedMessagesForMike, realMessagesForMike.messages); 
     }
 }

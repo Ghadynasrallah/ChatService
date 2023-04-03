@@ -16,7 +16,10 @@ public class CosmosMessageStorage : IMessageStorage
 
     private Container container => _cosmosClient.GetDatabase("ChatService").GetContainer("Messages");
     
-    public async Task<List<Message>?> EnumerateMessagesFromAGivenConversation(string conversationId)
+    public async Task<EnumerateMessagesInAConversationResponseDto?> EnumerateMessagesFromAGivenConversation(string conversationId,
+        string? continuationToken = null, 
+        int? limit = null,
+        long? lastSeenMessageTime=null)
     {
         try
         {
@@ -24,32 +27,36 @@ public class CosmosMessageStorage : IMessageStorage
             var queryOptions = new QueryRequestOptions
             {
                 PartitionKey = new PartitionKey(conversationId),
-                ConsistencyLevel = ConsistencyLevel.Session
+                ConsistencyLevel = ConsistencyLevel.Session,
+                MaxItemCount = limit ?? -1
             };
-            var iterator = container.GetItemQueryIterator<MessageEntity>(requestOptions: queryOptions);
+            
+            var queryText = "SELECT * FROM c ORDER BY c.unixTime ASC";
+            if (lastSeenMessageTime != null)
+            { 
+                queryText = $"SELECT * FROM c WHERE c.unixTime > {lastSeenMessageTime.ToString()} ORDER BY c.unixTime ASC";
+            }
+            var iterator = container.GetItemQueryIterator<MessageEntity>(requestOptions: queryOptions, queryText: queryText, continuationToken: continuationToken);
+            FeedResponse<MessageEntity> response = null;
             while (iterator.HasMoreResults)
             {
-                var response = await iterator.ReadNextAsync();
+                response = await iterator.ReadNextAsync();
                 foreach (var messageEntity in response)
                 {
                     messagesResult.Add(ToMessage(messageEntity));
                 }
+                response = await iterator.ReadNextAsync();
             }
-
-            return messagesResult;
+            return new EnumerateMessagesInAConversationResponseDto(messagesResult, response.ContinuationToken);
         }
         catch (CosmosException e)
         {
             if (e.StatusCode == HttpStatusCode.NotFound)
-            {
                 return null;
-            }
-
             throw;
         }
     }
     
-
     public async Task PostMessageToConversation(Message message)
     {
         if (String.IsNullOrWhiteSpace(message.conversationId) ||
@@ -80,14 +87,11 @@ public class CosmosMessageStorage : IMessageStorage
         catch (CosmosException e)
         {
             if (e.StatusCode == HttpStatusCode.NotFound)
-            {
                 return null;
-            }
-
             throw;
         }
     }
-
+    
     public async Task<bool> DeleteMessage(string conversationId, string messageId)
     {
         try

@@ -66,24 +66,24 @@ public class ConversationControllerTest :  IClassFixture<WebApplicationFactory<P
             new Message(Guid.NewGuid().ToString(), "What's up foo", "bar", "bar_foo", 1002)
         };
 
-        _messageStorageMock.Setup(mock => mock.EnumerateMessagesFromAGivenConversation("foo_bar"))
-            .ReturnsAsync(messages);
+        _messageStorageMock.Setup(mock => mock.EnumerateMessagesFromAGivenConversation("foo_bar", null, null, null))
+            .ReturnsAsync(new EnumerateMessagesInAConversationResponseDto(messages));
         var response = await _httpClient.GetAsync("Conversation/foo_bar/messages");
 
         Assert.Equal(response.StatusCode ,HttpStatusCode.OK);
         var json = await response.Content.ReadAsStringAsync();
         Assert.Equal(messages, JsonConvert.DeserializeObject<EnumerateMessagesInAConversationResponseDto>(json).messages);
-        _messageStorageMock.Verify(mock=>mock.EnumerateMessagesFromAGivenConversation("foo_bar"), Times.Once);
+        _messageStorageMock.Verify(mock=>mock.EnumerateMessagesFromAGivenConversation("foo_bar", null, null, null), Times.Once);
     }
 
     [Fact]
     public async Task EnumerateMessagesInANotFoundConversation()
     {
+        _messageStorageMock.Setup(m => m.EnumerateMessagesFromAGivenConversation("foo_bar", null, null, null))
+            .ReturnsAsync((EnumerateMessagesInAConversationResponseDto?) null);
         var response = await _httpClient.GetAsync("Conversation/foo_bar/messages");
-        _messageStorageMock.Setup(m => m.EnumerateMessagesFromAGivenConversation("foo_bar"))
-            .ReturnsAsync((List<Message>?) null);
         Assert.Equal(response.StatusCode ,HttpStatusCode.NotFound);
-        _messageStorageMock.Verify(mock=>mock.EnumerateMessagesFromAGivenConversation("foo_bar"), Times.Once);
+        _messageStorageMock.Verify(mock=>mock.EnumerateMessagesFromAGivenConversation("foo_bar", null, null, null), Times.Once);
     }
 
     [Fact]
