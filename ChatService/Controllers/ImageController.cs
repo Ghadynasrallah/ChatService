@@ -44,7 +44,6 @@ public class ImageController : ControllerBase
         var imageMemoryStream = new MemoryStream();
         await imageData.CopyToAsync(imageMemoryStream);
         imageMemoryStream.Position = 0;
-        //return Ok(imageMemoryStream);
         return Ok(new FileContentResult(imageMemoryStream.ToArray(), "image/jpeg"));
     }
 }
