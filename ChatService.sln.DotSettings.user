@@ -54,6 +54,7 @@
     &lt;Project Location="/Users/ghady/RiderProjects/ChatService/ChatService.Tests" Presentation="&amp;lt;ChatService.Tests&amp;gt;" /&gt;
     &lt;TestAncestor&gt;
       &lt;TestId&gt;xUnit::F4427AE0-442B-4C62-B41B-7CF2F63D3C15::net6.0::ChatService.Integrationtests.CosmosConversationStorageTest&lt;/TestId&gt;
+      &lt;TestId&gt;xUnit::F4427AE0-442B-4C62-B41B-7CF2F63D3C15::net6.0::ChatService.Integrationtests.CosmosMessageStorageTest&lt;/TestId&gt;
     &lt;/TestAncestor&gt;
   &lt;/Or&gt;
 &lt;/SessionState&gt;</s:String>

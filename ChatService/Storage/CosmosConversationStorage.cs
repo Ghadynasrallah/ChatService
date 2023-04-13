@@ -35,7 +35,6 @@ public class CosmosConversationStorage : IConversationStorage
                     conversationsResult.Add(ToConversation(conversationEntity));
                 }
             }
-
             return conversationsResult;
         }
         catch (CosmosException e)
@@ -48,30 +47,29 @@ public class CosmosConversationStorage : IConversationStorage
         }
     }
 
-    public async Task PostConversation(Conversation conversation)
+    public async Task<string> PostConversation(Conversation conversation)
     {
-        if (String.IsNullOrWhiteSpace(conversation.conversationId) ||
-            String.IsNullOrWhiteSpace(conversation.userId1) ||
+        if (String.IsNullOrWhiteSpace(conversation.userId1) ||
             String.IsNullOrWhiteSpace(conversation.userId2))
         {
             throw new ArgumentException($"Invalid conversation {conversation}", nameof(conversation));
         }
-
-        await container.UpsertItemAsync(ToConversationEntityForUser1(conversation));
-        await container.UpsertItemAsync(ToConversationEntityForUser2(conversation));
+        await container.UpsertItemAsync(ToConversationEntity(conversation, conversation.userId1));
+        await container.UpsertItemAsync(ToConversationEntity(conversation, conversation.userId2));
+        return GetConversationId(conversation.userId1, conversation.userId2);
     }
 
-    public async Task<Conversation?> GetConversation(string conversationId)
+    public async Task<Conversation?> GetConversation(string userId1,string userId2)
     {
-        if (String.IsNullOrWhiteSpace(conversationId))
+        if (String.IsNullOrWhiteSpace(userId1) ||
+            String.IsNullOrWhiteSpace(userId2))
         {
-            throw new ArgumentException("Invalid conversation ID: ID does not contain any text");
+            throw new ArgumentException("Invalid arguments");
         }
 
         try
         {
-            string[] parts = conversationId.Split("_");
-            string userId1 = parts[0];
+            string conversationId = GetConversationId(userId1, userId2);
             var conversationEntity = await container.ReadItemAsync<ConversationEntity>(
                 id: conversationId,
                 partitionKey: new PartitionKey(userId1),
@@ -85,26 +83,22 @@ public class CosmosConversationStorage : IConversationStorage
         catch (CosmosException e)
         {
             if (e.StatusCode == HttpStatusCode.NotFound)
-            {
                 return null;
-            }
-
             throw;
         }
     }
 
-    public async Task<bool> DeleteConversation(string conversationId)
+    public async Task<bool> DeleteConversation(string userId1, string userId2)
     {
-        if (String.IsNullOrWhiteSpace(conversationId))
+        if (String.IsNullOrWhiteSpace(userId1) ||
+            String.IsNullOrWhiteSpace(userId2))
         {
-            throw new ArgumentException("Invalid conversation ID: ID does not contain any text");
+            throw new ArgumentException("Invalid arguments");
         }
 
         try
         {
-            string[] parts = conversationId.Split("_");
-            string userId1 = parts[0];
-            string userId2 = parts[1];
+            string conversationId = GetConversationId(userId1, userId2);
             await container.DeleteItemAsync<ConversationEntity>(
                 id: conversationId,
                 partitionKey: new PartitionKey(userId1),
@@ -113,7 +107,7 @@ public class CosmosConversationStorage : IConversationStorage
                     ConsistencyLevel = ConsistencyLevel.Session
                 });
             await container.DeleteItemAsync<ConversationEntity>(
-                id: $"{userId2}_{userId1}",
+                id: conversationId,
                 partitionKey: new PartitionKey(userId2),
                 new ItemRequestOptions
                 {
@@ -124,30 +118,30 @@ public class CosmosConversationStorage : IConversationStorage
         catch (CosmosException e)
         {
             if (e.StatusCode == HttpStatusCode.NotFound)
-            {
                 return false;
-            }
-
             throw;
         }
     }
-    
-    
+
     private static Conversation ToConversation(ConversationEntity conversationEntity)
     {
-        return new Conversation(conversationEntity.id, conversationEntity.userId1, conversationEntity.userId2,
+        return new Conversation(conversationEntity.userId1, conversationEntity.userId2,
             conversationEntity.lastModifiedUnixTime);
     }
-
-    private static ConversationEntity ToConversationEntityForUser1(Conversation conversation)
-    {
-        return new ConversationEntity(conversation.userId1, $"{conversation.userId1}_{conversation.userId2}",
-            conversation.userId1, conversation.userId2, conversation.lastModifiedUnixTime);
-    } 
     
-    private static ConversationEntity ToConversationEntityForUser2(Conversation conversation)
+    private static string GetConversationId(string userId1, string userId2)
     {
-        return new ConversationEntity(conversation.userId2, $"{conversation.userId2}_{conversation.userId1}",
-            conversation.userId2, conversation.userId1, conversation.lastModifiedUnixTime);
-    } 
+        return string.CompareOrdinal(userId1, userId2) < 0 ? $"{userId1}_{userId2}" : $"{userId2}_{userId1}";
+    }
+    
+    private static ConversationEntity ToConversationEntity(Conversation conversation, string partitionKey)
+    {
+        string conversationId = GetConversationId(conversation.userId1, conversation.userId2);
+        return new ConversationEntity(
+            partitionKey: partitionKey,
+            id:conversationId,
+            userId1: conversation.userId1,
+            userId2: conversation.userId2,
+            lastModifiedUnixTime: conversation.lastModifiedUnixTime);
+    }
 }

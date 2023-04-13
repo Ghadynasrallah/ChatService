@@ -31,7 +31,7 @@ public class ConversationController : ControllerBase
         );
         try
         {
-            _messageStorage.PostMessageToConversation(message);
+            await _messageStorage.PostMessageToConversation(message);
             return CreatedAtAction(nameof(EnumerateMessagesInAConversation),
                                 new {messageId = message.messageId, conversationId = message.conversationId },
                                      new SendMessageResponse(message.unixTime));
@@ -64,32 +64,32 @@ public class ConversationController : ControllerBase
         string userId2 = startConversationRequestDto.userId2;
         var sendMessageRequest = startConversationRequestDto.sendMessageRequest;
 
-        var conversation = new Conversation($"{userId1}_{userId2}", userId1, userId2,
+        var conversation = new Conversation(userId1, userId2,
             DateTimeOffset.UtcNow.ToUnixTimeSeconds());
-        var message = new Message(
-            sendMessageRequest.messageId,
-            sendMessageRequest.text,
-            sendMessageRequest.senderUsername,
-            conversation.conversationId,
-            conversation.lastModifiedUnixTime
-        );
 
-        if (await _conversationStorage.GetConversation(conversation.conversationId) != null)
+        if (await _conversationStorage.GetConversation(conversation.userId1, conversation.userId2) != null)
         {
             return Conflict($"There already exists a conversation between {userId1} and {userId1}");
         }
         
         try
         {
-            await _conversationStorage.PostConversation(conversation);
-            bool sendFirstMessage = await sendFirstMessageWhenStartingAConversation(message);
+            string conversationId = await _conversationStorage.PostConversation(conversation);
+            var message = new Message(
+                sendMessageRequest.messageId,
+                sendMessageRequest.text,
+                sendMessageRequest.senderUsername,
+                conversationId,
+                conversation.lastModifiedUnixTime
+            );
+            bool sendFirstMessage = await SendFirstMessageWhenStartingAConversation(message);
             if (!sendFirstMessage)
             {
                 return BadRequest($"Invalid message arguments {message}");
             }
-            var startConversationResponse = new StartConversationResponseDto(conversation.conversationId, conversation.lastModifiedUnixTime);
+            var startConversationResponse = new StartConversationResponseDto(conversationId, conversation.lastModifiedUnixTime);
             return CreatedAtAction(nameof(EnumerateConversationsOfAGivenUser), 
-                                new { conversationId = conversation.conversationId },
+                                new { conversationId = conversationId },
                                 startConversationResponse);
         }
         catch (ArgumentException)
@@ -101,7 +101,7 @@ public class ConversationController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<EnumerateConversationsOfAGivenUserDto>> EnumerateConversationsOfAGivenUser([FromQuery] string userId) 
     {
-        List<Conversation> conversations = await _conversationStorage.EnumerateConversationsForAGivenUser(userId);
+        List<Conversation>? conversations = await _conversationStorage.EnumerateConversationsForAGivenUser(userId);
         if (conversations == null)
         {
             return NotFound($"There exists no user with user ID {userId}");
@@ -110,7 +110,7 @@ public class ConversationController : ControllerBase
         return Ok(new EnumerateConversationsOfAGivenUserDto(conversations, null));
     }
 
-    private async Task<bool> sendFirstMessageWhenStartingAConversation(Message message)
+    private async Task<bool> SendFirstMessageWhenStartingAConversation(Message message)
     {
         try
         {

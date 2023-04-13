@@ -13,7 +13,7 @@ public class CosmosMessageStorageTest : IClassFixture<WebApplicationFactory<Prog
     private readonly IMessageStorage _store;
     
     private readonly Message _message1 = new Message(Guid.NewGuid().ToString(), "Hello", "foo", "foo_mike", 10000);
-    private readonly Message _message2 = new Message(Guid.NewGuid().ToString(), "Hi", "mike", "mike_foo", 10001);
+    private readonly Message _message2 = new Message(Guid.NewGuid().ToString(), "Hi", "mike", "foo_mike", 10001);
 
     public CosmosMessageStorageTest(WebApplicationFactory<Program> factory)
     {
@@ -35,11 +35,7 @@ public class CosmosMessageStorageTest : IClassFixture<WebApplicationFactory<Prog
     public async Task PostValidMessage()
     {
         await _store.PostMessageToConversation(_message1);
-        var _message1Flipped = new Message(_message1.messageId, _message1.text, _message1.senderUsername, "mike_foo",
-            _message1.unixTime);
-        
-        Assert.Equal(_message1, await _store.GetMessage("foo_mike", _message1.messageId));
-        Assert.Equal(_message1Flipped, await _store.GetMessage("mike_foo", _message1.messageId));
+        Assert.Equal(_message1, await _store.GetMessage(_message1.conversationId, _message1.messageId));
     }
 
     [Xunit.Theory]
@@ -95,22 +91,13 @@ public class CosmosMessageStorageTest : IClassFixture<WebApplicationFactory<Prog
         await _store.PostMessageToConversation(_message1);
         await _store.PostMessageToConversation(_message2);
 
-        List<Message> expectedMessagesForFoo = new List<Message>()
+        List<Message> expectedMessages = new List<Message>()
         {
             _message1,
-            new Message(_message2.messageId, _message2.text, _message2.senderUsername, "foo_mike", _message2.unixTime)
-        };
-        
-        List<Message> expectedMessagesForMike = new List<Message>()
-        {
-            new Message(_message1.messageId, _message1.text, _message1.senderUsername, "mike_foo", _message1.unixTime),
             _message2
         };
 
-        var realMessagesForFoo = await _store.EnumerateMessagesFromAGivenConversation("foo_mike");
-        var realMessagesForMike = await _store.EnumerateMessagesFromAGivenConversation("mike_foo");
-        
-        CollectionAssert.AreEquivalent(expectedMessagesForFoo, realMessagesForFoo.messages); 
-        CollectionAssert.AreEquivalent(expectedMessagesForMike, realMessagesForMike.messages); 
+        var realMessages = await _store.EnumerateMessagesFromAGivenConversation("foo_mike");
+        CollectionAssert.AreEquivalent(expectedMessages, realMessages.messages);
     }
 }
