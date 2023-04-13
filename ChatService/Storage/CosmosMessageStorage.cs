@@ -16,10 +16,11 @@ public class CosmosMessageStorage : IMessageStorage
 
     private Container container => _cosmosClient.GetDatabase("ChatService").GetContainer("Messages");
     
-    public async Task<EnumerateMessagesInAConversationResponseDto?> EnumerateMessagesFromAGivenConversation(string conversationId,
-        string? continuationToken = null, 
+    public async Task<EnumerateMessagesStorageResponseDto?> EnumerateMessagesFromAGivenConversation(
+        string conversationId,
+        string? continuationToken = null,
         int? limit = null,
-        long? lastSeenMessageTime=null)
+        long? lastSeenMessageTime = null)
     {
         try
         {
@@ -37,7 +38,7 @@ public class CosmosMessageStorage : IMessageStorage
                 queryText = $"SELECT * FROM c WHERE c.unixTime > {lastSeenMessageTime.ToString()} ORDER BY c.unixTime ASC";
             }
             var iterator = container.GetItemQueryIterator<MessageEntity>(requestOptions: queryOptions, queryText: queryText, continuationToken: continuationToken);
-            FeedResponse<MessageEntity> response = null;
+            FeedResponse<MessageEntity>? response = null;
             while (iterator.HasMoreResults)
             {
                 response = await iterator.ReadNextAsync();
@@ -45,9 +46,11 @@ public class CosmosMessageStorage : IMessageStorage
                 {
                     messagesResult.Add(ToMessage(messageEntity));
                 }
-                response = await iterator.ReadNextAsync();
             }
-            return new EnumerateMessagesInAConversationResponseDto(messagesResult, response.ContinuationToken);
+
+            if (response?.ContinuationToken != null)
+                return new EnumerateMessagesStorageResponseDto(messagesResult, response.ContinuationToken);
+            return new EnumerateMessagesStorageResponseDto(messagesResult, null);
         }
         catch (CosmosException e)
         {

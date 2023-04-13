@@ -16,26 +16,40 @@ public class CosmosConversationStorage : IConversationStorage
 
     private Container container => _cosmosClient.GetDatabase("ChatService").GetContainer("Conversations");
     
-    public async Task<List<Conversation>?> EnumerateConversationsForAGivenUser(string userId)
+    public async Task<EnumerateConversationsStorageResponseDto?> EnumerateConversationsForAGivenUser(
+        string conversationId,
+        string? continuationToken = null,
+        int? limit = null,
+        long? lastSeenMessageTime = null)
     {
         try
         {
             List<Conversation> conversationsResult = new List<Conversation>();
             var queryOptions = new QueryRequestOptions
             {
-                PartitionKey = new PartitionKey(userId),
-                ConsistencyLevel = ConsistencyLevel.Session
+                PartitionKey = new PartitionKey(conversationId),
+                ConsistencyLevel = ConsistencyLevel.Session,
+                MaxItemCount = limit ?? -1
             };
-            var iterator = container.GetItemQueryIterator<ConversationEntity>(requestOptions: queryOptions);
+            
+            var queryText = "SELECT * FROM c ORDER BY c.lastModifiedUnixTime ASC";
+            if (lastSeenMessageTime != null)
+            { 
+                queryText = $"SELECT * FROM c WHERE c.lastModifiedUnixTime > {lastSeenMessageTime.ToString()} ORDER BY c.lastModifiedUnixTime ASC";
+            }
+            var iterator = container.GetItemQueryIterator<ConversationEntity>(requestOptions: queryOptions, queryText: queryText, continuationToken: continuationToken);
+            FeedResponse<ConversationEntity>? response = null;
             while (iterator.HasMoreResults)
             {
-                var response = await iterator.ReadNextAsync();
+                response = await iterator.ReadNextAsync();
                 foreach (var conversationEntity in response)
                 {
                     conversationsResult.Add(ToConversation(conversationEntity));
                 }
             }
-            return conversationsResult;
+            if (response?.ContinuationToken != null)
+                return new EnumerateConversationsStorageResponseDto(conversationsResult, response.ContinuationToken);
+            return new EnumerateConversationsStorageResponseDto(conversationsResult, null);
         }
         catch (CosmosException e)
         {

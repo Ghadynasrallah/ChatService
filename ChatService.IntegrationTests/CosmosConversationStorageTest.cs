@@ -112,8 +112,8 @@ public class CosmosConversationStorageTest :  IClassFixture<WebApplicationFactor
         var realConversationsForMike = await _store.EnumerateConversationsForAGivenUser("mike");
         var realConversationsForRipper = await _store.EnumerateConversationsForAGivenUser("ripper");
         
-        CollectionAssert.AreEquivalent(expectedConversationsForJohn, realConversationsForJohn); 
-        CollectionAssert.AreEquivalent(expectedConversationsForMike, realConversationsForMike); 
-        CollectionAssert.AreEquivalent(expectedConversationsForRipper, realConversationsForRipper); 
+        CollectionAssert.AreEquivalent(expectedConversationsForJohn, realConversationsForJohn.conversations); 
+        CollectionAssert.AreEquivalent(expectedConversationsForMike, realConversationsForMike.conversations); 
+        CollectionAssert.AreEquivalent(expectedConversationsForRipper, realConversationsForRipper.conversations); 
     }
 }

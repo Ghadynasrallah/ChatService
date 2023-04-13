@@ -101,13 +101,13 @@ public class ConversationController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<EnumerateConversationsOfAGivenUserDto>> EnumerateConversationsOfAGivenUser([FromQuery] string userId) 
     {
-        List<Conversation>? conversations = await _conversationStorage.EnumerateConversationsForAGivenUser(userId);
-        if (conversations == null)
+        EnumerateConversationsStorageResponseDto? response = await _conversationStorage.EnumerateConversationsForAGivenUser(userId);
+        if (response == null)
         {
             return NotFound($"There exists no user with user ID {userId}");
         }
 
-        return Ok(new EnumerateConversationsOfAGivenUserDto(conversations, null));
+        return Ok(response);
     }
 
     private async Task<bool> SendFirstMessageWhenStartingAConversation(Message message)
