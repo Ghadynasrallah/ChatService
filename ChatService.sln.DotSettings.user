@@ -17,7 +17,17 @@
     &lt;TestId&gt;xUnit::252F874B-3A9F-496E-9CCA-BB9EF722273A::net6.0::ChatService.Tests.UserControllerTest&lt;/TestId&gt;
   &lt;/TestAncestor&gt;
 &lt;/SessionState&gt;</s:String>
-	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=55c357f3_002Daa84_002D4426_002Db729_002Dc4af6302f2fa/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" IsActive="True" Name="DownloadNonValidImage" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;
+	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=16ad0169_002D0b27_002D48a9_002D9e4b_002Dc9a6a54a594c/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" Name="DownloadValidImage #2" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;
+  &lt;TestAncestor&gt;
+    &lt;TestId&gt;xUnit::252F874B-3A9F-496E-9CCA-BB9EF722273A::net6.0::ChatService.Tests.ImageControllerTest.DownloadValidImage&lt;/TestId&gt;
+  &lt;/TestAncestor&gt;
+&lt;/SessionState&gt;</s:String>
+	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=48715504_002D4858_002D4a38_002D9699_002D57513ceb1ae2/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" Name="ImageControllerTest #2" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;
+  &lt;TestAncestor&gt;
+    &lt;TestId&gt;xUnit::252F874B-3A9F-496E-9CCA-BB9EF722273A::net6.0::ChatService.Tests.ImageControllerTest&lt;/TestId&gt;
+  &lt;/TestAncestor&gt;
+&lt;/SessionState&gt;</s:String>
+	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=55c357f3_002Daa84_002D4426_002Db729_002Dc4af6302f2fa/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" Name="DownloadNonValidImage" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;
   &lt;TestAncestor&gt;
     &lt;TestId&gt;xUnit::252F874B-3A9F-496E-9CCA-BB9EF722273A::net6.0::ChatService.Tests.ImageControllerTest.DownloadNonValidImage&lt;/TestId&gt;
     &lt;TestId&gt;xUnit::F4427AE0-442B-4C62-B41B-7CF2F63D3C15::net6.0::ChatService.Integrationtests.CloudBlobProfilePictureStorageTest&lt;/TestId&gt;
@@ -28,6 +38,24 @@
     &lt;TestId&gt;xUnit::F4427AE0-442B-4C62-B41B-7CF2F63D3C15::net6.0::ChatService.Integrationtests.CosmosMessageStorageTest&lt;/TestId&gt;
     &lt;TestId&gt;xUnit::252F874B-3A9F-496E-9CCA-BB9EF722273A::net6.0::ChatService.Tests.ConversationControllerTest&lt;/TestId&gt;
   &lt;/TestAncestor&gt;
+&lt;/SessionState&gt;</s:String>
+	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=7b5ee6fd_002D2baf_002D4181_002Dac2c_002Daf8fec7ddba6/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" Name="DownloadValidImage #3" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;
+  &lt;TestAncestor&gt;
+    &lt;TestId&gt;xUnit::252F874B-3A9F-496E-9CCA-BB9EF722273A::net6.0::ChatService.Tests.ImageControllerTest.DownloadValidImage&lt;/TestId&gt;
+  &lt;/TestAncestor&gt;
+&lt;/SessionState&gt;</s:String>
+	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=81378dd1_002De240_002D406b_002D833c_002D0804338547ec/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" Name="DownloadValidImage" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;
+  &lt;TestAncestor&gt;
+    &lt;TestId&gt;xUnit::252F874B-3A9F-496E-9CCA-BB9EF722273A::net6.0::ChatService.Tests.ImageControllerTest.DownloadValidImage&lt;/TestId&gt;
+  &lt;/TestAncestor&gt;
+&lt;/SessionState&gt;</s:String>
+	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=90357cde_002Dd7f1_002D46c1_002D904e_002D804e780d87af/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" IsActive="True" Name="ImageControllerTest" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;
+  &lt;Or&gt;
+    &lt;Project Location="/Users/ghady/RiderProjects/ChatService/ChatService.Tests" Presentation="&amp;lt;ChatService.Tests&amp;gt;" /&gt;
+    &lt;TestAncestor&gt;
+      &lt;TestId&gt;xUnit::F4427AE0-442B-4C62-B41B-7CF2F63D3C15::net6.0::ChatService.Integrationtests.CosmosConversationStorageTest&lt;/TestId&gt;
+    &lt;/TestAncestor&gt;
+  &lt;/Or&gt;
 &lt;/SessionState&gt;</s:String>
 	
 	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=eece07bb_002D74df_002D41c5_002D933f_002D9bf033b02d66/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" Name="test2" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;
@@ -44,5 +72,6 @@
     &lt;TestId&gt;xUnit::F4427AE0-442B-4C62-B41B-7CF2F63D3C15::net6.0::ChatService.Integrationtests.CosmosConversationStorageTest&lt;/TestId&gt;
     &lt;TestId&gt;xUnit::F4427AE0-442B-4C62-B41B-7CF2F63D3C15::net6.0::ChatService.Integrationtests.CosmosMessageStorageTest&lt;/TestId&gt;
     &lt;TestId&gt;xUnit::252F874B-3A9F-496E-9CCA-BB9EF722273A::net6.0::ChatService.Tests.ConversationControllerTest&lt;/TestId&gt;
+    &lt;TestId&gt;xUnit::252F874B-3A9F-496E-9CCA-BB9EF722273A::net6.0::ChatService.Tests.ImageControllerTest.DownloadValidImage&lt;/TestId&gt;
   &lt;/TestAncestor&gt;
 &lt;/SessionState&gt;</s:String></wpf:ResourceDictionary>
