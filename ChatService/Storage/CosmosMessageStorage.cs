@@ -1,5 +1,6 @@
 using System.Net;
 using ChatService.Dtos;
+using ChatService.Exceptions;
 using ChatService.Storage.Entities;
 using Microsoft.Azure.Cosmos;
 
@@ -48,28 +49,20 @@ public class CosmosMessageStorage : IMessageStorage
                 }
             }
 
-            if (response?.ContinuationToken != null)
+            if (response != null)
                 return new EnumerateMessagesStorageResponseDto(messagesResult, response.ContinuationToken);
             return new EnumerateMessagesStorageResponseDto(messagesResult, null);
         }
         catch (CosmosException e)
         {
             if (e.StatusCode == HttpStatusCode.NotFound)
-                return null;
+                throw new MessageNotFoundException($"The are no messages for the conversation with id {conversationId}");
             throw;
         }
     }
     
     public async Task PostMessageToConversation(Message message)
     {
-        if (String.IsNullOrWhiteSpace(message.conversationId) ||
-            String.IsNullOrWhiteSpace(message.text) ||
-            String.IsNullOrWhiteSpace(message.senderUsername) ||
-            String.IsNullOrWhiteSpace(message.messageId))
-        {
-            throw new ArgumentException($"Invalid message {message}", nameof(message));
-        }
-
         await container.UpsertItemAsync(ToMessageEntity(message));
     }
 

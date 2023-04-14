@@ -73,7 +73,7 @@ public class ConversationControllerTest :  IClassFixture<WebApplicationFactory<P
 
         Assert.Equal(HttpStatusCode.OK,response.StatusCode );
         var json = await response.Content.ReadAsStringAsync();
-        Assert.Equal(messages, JsonConvert.DeserializeObject<EnumerateMessagesInAConversationResponseDto>(json).messages);
+        Assert.Equal(messages, JsonConvert.DeserializeObject<EnumerateMessagesControllerResponseeDto>(json).messages);
         _messageStorageMock.Verify(mock=>mock.EnumerateMessagesFromAGivenConversation("foo_bar", null, null, null), Times.Once);
     }
 
@@ -91,7 +91,8 @@ public class ConversationControllerTest :  IClassFixture<WebApplicationFactory<P
     public async Task StartValidConversation()
     {
         var sendMessageRequest = new SendMessageRequest(Guid.NewGuid().ToString(), "foo", "Hello");
-        var startConversationRequest = new StartConversationRequestDto("foo", "bar", sendMessageRequest);
+        List<string> participants = new List<string>(){"foo", "bar"};
+        var startConversationRequest = new StartConversationRequestDto(participants, sendMessageRequest);
         _conversationStorageMock.Setup(m => m.GetConversation("foo", "bar")).ReturnsAsync((Conversation?)null);
         
         var response = await _httpClient.PostAsync("Conversation/",
@@ -107,7 +108,8 @@ public class ConversationControllerTest :  IClassFixture<WebApplicationFactory<P
     public async Task StartAlreadyExistingConversation()
     {
         var sendMessageRequest = new SendMessageRequest(Guid.NewGuid().ToString(), "foo", "Hello");
-        var startConversationRequest = new StartConversationRequestDto("foo", "bar", sendMessageRequest);
+        List<string> participants = new List<string>(){"foo", "bar"};
+        var startConversationRequest = new StartConversationRequestDto(participants, sendMessageRequest);
         _conversationStorageMock.Setup(m => m.GetConversation("foo", "bar"))
             .ReturnsAsync(new Conversation("foo", "bar", 1000));
         
@@ -138,7 +140,8 @@ public class ConversationControllerTest :  IClassFixture<WebApplicationFactory<P
         string senderUsername, string text)
     {
         var sendMessageRequest = new SendMessageRequest(messageId, senderUsername, text);
-        var startConversationRequest = new StartConversationRequestDto(userId1, userId2, sendMessageRequest);
+        List<string> participants = new List<string>(){userId1, userId2};
+        var startConversationRequest = new StartConversationRequestDto(participants, sendMessageRequest);
         
         var response = await _httpClient.PostAsync("Conversation",
             new StringContent(JsonConvert.SerializeObject(startConversationRequest), Encoding.Default, "application/json"));

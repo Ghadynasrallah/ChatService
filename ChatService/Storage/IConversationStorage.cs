@@ -12,6 +12,6 @@ public interface IConversationStorage
     public Task<string> PostConversation(Conversation conversation);
 
     public Task<Conversation?> GetConversation(string userId1, string userId2);
-
+    public Task<Conversation?> GetConversation(string conversationId);
     public Task<bool> DeleteConversation(string userId1, string userId2);
 }

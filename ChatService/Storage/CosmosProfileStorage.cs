@@ -1,6 +1,7 @@
 using System.Net;
 using Microsoft.Azure.Cosmos;
 using ChatService.Dtos;
+using ChatService.Exceptions;
 using ChatService.Storage.Entities;
 
 
@@ -47,7 +48,7 @@ public class CosmosProfileStorage : IProfileStorage
         catch (CosmosException e)
         {
             if (e.StatusCode == HttpStatusCode.NotFound)
-                return null;
+                throw new UserNotFoundException($"The user with username {username} was not found", e);
             throw;
         }
     }

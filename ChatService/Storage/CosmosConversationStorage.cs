@@ -1,5 +1,6 @@
 using System.Net;
 using ChatService.Dtos;
+using ChatService.Exceptions;
 using ChatService.Storage.Entities;
 using Microsoft.Azure.Cosmos;
 
@@ -17,25 +18,25 @@ public class CosmosConversationStorage : IConversationStorage
     private Container container => _cosmosClient.GetDatabase("ChatService").GetContainer("Conversations");
     
     public async Task<EnumerateConversationsStorageResponseDto?> EnumerateConversationsForAGivenUser(
-        string conversationId,
+        string userId,
         string? continuationToken = null,
         int? limit = null,
-        long? lastSeenMessageTime = null)
+        long? lastSeenConversationTime = null)
     {
         try
         {
             List<Conversation> conversationsResult = new List<Conversation>();
             var queryOptions = new QueryRequestOptions
             {
-                PartitionKey = new PartitionKey(conversationId),
+                PartitionKey = new PartitionKey(userId),
                 ConsistencyLevel = ConsistencyLevel.Session,
                 MaxItemCount = limit ?? -1
             };
             
             var queryText = "SELECT * FROM c ORDER BY c.lastModifiedUnixTime ASC";
-            if (lastSeenMessageTime != null)
+            if (lastSeenConversationTime != null)
             { 
-                queryText = $"SELECT * FROM c WHERE c.lastModifiedUnixTime > {lastSeenMessageTime.ToString()} ORDER BY c.lastModifiedUnixTime ASC";
+                queryText = $"SELECT * FROM c WHERE c.lastModifiedUnixTime > {lastSeenConversationTime.ToString()} ORDER BY c.lastModifiedUnixTime ASC";
             }
             var iterator = container.GetItemQueryIterator<ConversationEntity>(requestOptions: queryOptions, queryText: queryText, continuationToken: continuationToken);
             FeedResponse<ConversationEntity>? response = null;
@@ -55,7 +56,7 @@ public class CosmosConversationStorage : IConversationStorage
         {
             if (e.StatusCode == HttpStatusCode.NotFound)
             {
-                return null;
+                throw new ConversationNotFoundException($"There exists no conversations for the user with ID {userId}");
             }
             throw;
         }
@@ -63,11 +64,6 @@ public class CosmosConversationStorage : IConversationStorage
 
     public async Task<string> PostConversation(Conversation conversation)
     {
-        if (String.IsNullOrWhiteSpace(conversation.userId1) ||
-            String.IsNullOrWhiteSpace(conversation.userId2))
-        {
-            throw new ArgumentException($"Invalid conversation {conversation}", nameof(conversation));
-        }
         await container.UpsertItemAsync(ToConversationEntity(conversation, conversation.userId1));
         await container.UpsertItemAsync(ToConversationEntity(conversation, conversation.userId2));
         return GetConversationId(conversation.userId1, conversation.userId2);
@@ -75,12 +71,6 @@ public class CosmosConversationStorage : IConversationStorage
 
     public async Task<Conversation?> GetConversation(string userId1,string userId2)
     {
-        if (String.IsNullOrWhiteSpace(userId1) ||
-            String.IsNullOrWhiteSpace(userId2))
-        {
-            throw new ArgumentException("Invalid arguments");
-        }
-
         try
         {
             string conversationId = GetConversationId(userId1, userId2);
@@ -97,9 +87,17 @@ public class CosmosConversationStorage : IConversationStorage
         catch (CosmosException e)
         {
             if (e.StatusCode == HttpStatusCode.NotFound)
-                return null;
+                throw new ConversationNotFoundException(
+                    $"There exists no conversation between {userId1} and {userId2}");
             throw;
         }
+    }
+
+    public async Task<Conversation?> GetConversation(string conversationId)
+    {
+        string userId1 = conversationId.Split("_")[0];
+        string userId2 = conversationId.Split("_")[1];
+        return await GetConversation(userId1, userId2);
     }
 
     public async Task<bool> DeleteConversation(string userId1, string userId2)
