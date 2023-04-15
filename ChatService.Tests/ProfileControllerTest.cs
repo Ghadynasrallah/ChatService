@@ -28,16 +28,16 @@ public class UserControllerTest : IClassFixture<WebApplicationFactory<Program>>
     public async Task GetProfile()
     {
         var profile = new Profile("foobar", "Foo", "Bar", Guid.NewGuid().ToString());
-        _profileStorageMock.Setup(m => m.GetProfile(profile.username))
+        _profileStorageMock.Setup(m => m.GetProfile(profile.Username))
             .ReturnsAsync(profile);
         
-        var response = await _httpClient.GetAsync($"Profile/{profile.username}");
+        var response = await _httpClient.GetAsync($"Profile/{profile.Username}");
         
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var json = await response.Content.ReadAsStringAsync();
         Assert.Equal(profile, JsonConvert.DeserializeObject<Profile>(json));
 
-        _profileStorageMock.Verify(m => m.GetProfile(profile.username), Times.Once);
+        _profileStorageMock.Verify(m => m.GetProfile(profile.Username), Times.Once);
 
     }
 
@@ -68,7 +68,7 @@ public class UserControllerTest : IClassFixture<WebApplicationFactory<Program>>
     public async Task AddProfile_Conflict()
     {
         var profile = new Profile("foobar", "Foo", "Bar", Guid.NewGuid().ToString());
-        _profileStorageMock.Setup(m => m.GetProfile(profile.username))
+        _profileStorageMock.Setup(m => m.GetProfile(profile.Username))
             .ReturnsAsync(profile);
 
         var response = await _httpClient.PostAsync("/Profile",
@@ -103,12 +103,12 @@ public class UserControllerTest : IClassFixture<WebApplicationFactory<Program>>
     public async Task UpdateProfile()
     {
         var profile = new Profile("foobar", "Foo", "Bar", Guid.NewGuid().ToString());
-        _profileStorageMock.Setup(m => m.GetProfile(profile.username))
+        _profileStorageMock.Setup(m => m.GetProfile(profile.Username))
             .ReturnsAsync(profile);
 
-        var updatedProfile = profile with { firstName = "Foo2", lastName = "Bar2", profilePictureId = Guid.NewGuid().ToString()};
+        var updatedProfile = profile with { FirstName = "Foo2", LastName = "Bar2", ProfilePictureId = Guid.NewGuid().ToString()};
 
-        var response = await _httpClient.PutAsync($"/Profile/{profile.username}",
+        var response = await _httpClient.PutAsync($"/Profile/{profile.Username}",
             new StringContent(JsonConvert.SerializeObject(updatedProfile), Encoding.Default, "application/json"));
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         _profileStorageMock.Verify(mock => mock.UpsertProfile(updatedProfile));
@@ -118,11 +118,11 @@ public class UserControllerTest : IClassFixture<WebApplicationFactory<Program>>
     public async Task UpdateProfile_NotFound()
     {
         var profile = new Profile("foobar", "Foo", "Bar", Guid.NewGuid().ToString());
-        _profileStorageMock.Setup(m => m.GetProfile(profile.username))
+        _profileStorageMock.Setup(m => m.GetProfile(profile.Username))
             .ReturnsAsync((Profile?)null);
-        var putProfileRequest = new PutProfileRequest(profile.firstName, profile.lastName, profile.profilePictureId);
+        var putProfileRequest = new PutProfileRequest(profile.FirstName, profile.LastName, profile.ProfilePictureId);
 
-        var response = await _httpClient.PutAsync($"User/{profile.username}",
+        var response = await _httpClient.PutAsync($"User/{profile.Username}",
             new StringContent(JsonConvert.SerializeObject(putProfileRequest), Encoding.Default, "application/json"));
         
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -141,7 +141,7 @@ public class UserControllerTest : IClassFixture<WebApplicationFactory<Program>>
         var putProfileRequest = new PutProfileRequest(firstName, lastName, Guid.NewGuid().ToString());
         var profile = new Profile("foobar", "Foo", "Bar", Guid.NewGuid().ToString());
 
-        _profileStorageMock.Setup(m => m.GetProfile(profile.username))
+        _profileStorageMock.Setup(m => m.GetProfile(profile.Username))
             .ReturnsAsync(profile);
         
         var response = await _httpClient.PostAsync($"/Profile/{username}",

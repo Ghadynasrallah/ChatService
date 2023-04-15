@@ -1,4 +1,6 @@
 using ChatService.Dtos;
+using ChatService.Exceptions;
+using ChatService.Services;
 using ChatService.Storage;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Cosmos;
@@ -10,23 +12,28 @@ namespace ChatService.Controllers;
 [Route("[Controller]")]
 public class ProfileController : ControllerBase
 {
-    private readonly IProfileStorage _profileStorage;
+    private readonly ProfileService _profileService;
 
-    public ProfileController(IProfileStorage profileStorage)
+    public ProfileController(ProfileService profileService)
     {
-        _profileStorage = profileStorage;
+        _profileService = profileService;
     }
 
     [HttpGet("{username}")]
     public async Task<ActionResult<Profile>> GetProfile([FromRoute] string username)
     {
-        var profile = await _profileStorage.GetProfile(username);
-        if (profile == null)
+        try
         {
-            return NotFound($"A user with username {username} was not found");
+            return Ok(await _profileService.GetProfile(username));
         }
-
-        return Ok(profile);
+        catch (UserNotFoundException exception)
+        {
+            return NotFound($"The user with user ID {username} was not found");
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest($"Invalid username: username cannot be null or empty");
+        }
     }
 
     [HttpPost]
@@ -34,43 +41,33 @@ public class ProfileController : ControllerBase
     {
         try
         {
-            var existingProfile = await _profileStorage.GetProfile(profile.username);
-            if (existingProfile != null)
-            {
-                return Conflict($"A user with username {profile.username} already exists");
-            }
-
-            await _profileStorage.UpsertProfile(profile);
-            return CreatedAtAction(nameof(GetProfile), new { username = profile.username }, profile);
+            await _profileService.AddProfile(profile);
+            return CreatedAtAction(nameof(GetProfile), new { username = profile.Username }, profile);
         }
         catch (ArgumentException)
         {
-            return BadRequest($"Invalid profile {profile}");
+            return BadRequest($"Invalid profile arguments {profile}");
+        }
+        catch (UserConflictException)
+        {
+            return Conflict($"A user with username {profile.Username} already exists");
         }
     }
 
     [HttpPut("{username}")]
-    public async Task<ActionResult<Profile>> UpdateProfile(String username, [FromBody] PutProfileRequest putProfile)
+    public async Task<ActionResult<Profile>> UpdateProfile(string username, [FromBody] PutProfileRequest putProfile)
     {
         try
         {
-            var existingProfile = await _profileStorage.GetProfile(username);
-            if (existingProfile == null)
-            {
-                return NotFound($"A user with username {username} does not exist");
-            }
-
-            var updatedProfile = new Profile(username, putProfile.FirstName, putProfile.LastName,
-                putProfile.ProfilePictureId);
-            await _profileStorage.UpsertProfile(updatedProfile);
-            return Ok(updatedProfile);
+            return Ok(await _profileService.UpdateProfile(username, putProfile));
         }
         catch (ArgumentException)
         {
-            var updatedProfile = new Profile(username, putProfile.FirstName, putProfile.LastName,
-                putProfile.ProfilePictureId);
-            return BadRequest($"Invalid profile {updatedProfile}");
+            return BadRequest($"Invalid Arguments: Username, FirstName, LastName cannot be null or empty");
+        }
+        catch (UserNotFoundException)
+        {
+            return NotFound($"The user with username {username} was not found");
         }
     }
-    
 }

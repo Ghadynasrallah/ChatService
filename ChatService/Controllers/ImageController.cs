@@ -1,4 +1,6 @@
 using ChatService.Dtos;
+using ChatService.Exceptions;
+using ChatService.Services;
 using ChatService.Storage;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Cosmos;
@@ -10,11 +12,11 @@ namespace ChatService.Controllers;
 [Route("[Controller]")]
 public class ImageController : ControllerBase
 {
-    private readonly IProfilePictureStorage _profilePictureStorage;
+    private readonly ImageService _imageService;
 
-    public ImageController(IProfilePictureStorage profilePictureStorage)
+    public ImageController(ImageService imageService)
     {
-        _profilePictureStorage = profilePictureStorage;
+        _imageService = imageService;
     }
 
     [HttpPost]
@@ -22,7 +24,8 @@ public class ImageController : ControllerBase
     {
         try
         {
-            var imageId = await _profilePictureStorage.UploadImage(uploadImageRequest.File.OpenReadStream());
+            var profilePictureData = uploadImageRequest.File.OpenReadStream();
+            var imageId = await _imageService.UploadImage(profilePictureData);
             return Ok(new UploadImageResponse(imageId));
         }
         catch (ArgumentException)
@@ -32,18 +35,23 @@ public class ImageController : ControllerBase
     }
 
     [HttpGet("{id}")]
-    public async Task<ActionResult> DownloadImage([FromRoute] string id)
+    public async Task<ActionResult> DownloadImage([FromRoute] string imageId)
     {
-        var imageData = await _profilePictureStorage.DownloadImage(id);
-        
-        if (imageData == null)
+        try
         {
-            return NotFound($"The image with id {id} was not found");
+            var imageData = await _imageService.DownloadImage(imageId);
+            var imageMemoryStream = new MemoryStream();
+            await imageData.CopyToAsync(imageMemoryStream);
+            imageMemoryStream.Position = 0;
+            return new FileContentResult(imageMemoryStream.ToArray(), "image/jpeg");
         }
-    
-        var imageMemoryStream = new MemoryStream();
-        await imageData.CopyToAsync(imageMemoryStream);
-        imageMemoryStream.Position = 0;
-        return new FileContentResult(imageMemoryStream.ToArray(), "image/jpeg");
+        catch (ArgumentException)
+        {
+            return BadRequest("Invalid Argument: Image ID cannot be null or empty");
+        }
+        catch (ImageNotFoundException)
+        {
+            return NotFound($"There exists no image with ID {imageId}");
+        }
     }
 }

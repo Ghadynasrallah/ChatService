@@ -33,7 +33,8 @@ public class CloudBlobProfilePictureStorageTest : IClassFixture<WebApplicationFa
     [Fact]
     public async void UploadAndDownloadValidImage()
     {
-        var guid = await _IProfilePictureStorage.UploadImage(ImageStream);
+        var guid = Guid.NewGuid().ToString();
+        await _IProfilePictureStorage.UploadImage(guid, ImageStream);
         var blobStream = await _IProfilePictureStorage.DownloadImage(guid);
 
         Assert.Equal(ImageStreamContent, ConvertStreamToByteArray(blobStream));
@@ -41,15 +42,10 @@ public class CloudBlobProfilePictureStorageTest : IClassFixture<WebApplicationFa
     }
 
     [Fact]
-    public async void UploadEmptyImage()
-    {
-        Assert.ThrowsAsync<ArgumentException>(async () => await _IProfilePictureStorage.UploadImage(EmptyStream));
-    }
-
-    [Fact]
     public async void DeleteValidImage()
     {
-        var guid = await _IProfilePictureStorage.UploadImage(ImageStream);
+        var guid = Guid.NewGuid().ToString();
+        await _IProfilePictureStorage.UploadImage(guid, ImageStream);
         var blobStream = await _IProfilePictureStorage.DownloadImage(guid);
         
         Assert.Equal(ImageStreamContent, ConvertStreamToByteArray(blobStream));

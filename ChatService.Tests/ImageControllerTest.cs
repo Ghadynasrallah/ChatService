@@ -43,17 +43,16 @@ public class ImageControllerTest : IClassFixture<WebApplicationFactory<Program>>
         formData.Add(fileStreamContent);
 
         var guid = Guid.NewGuid().ToString();
-        _profilePictureStorageMock.Setup(m => m.UploadImage(It.IsAny<Stream>()))
-            .ReturnsAsync(guid);
+        _profilePictureStorageMock.Setup(m => m.UploadImage(guid, It.IsAny<Stream>()));
 
         var response = await _httpClient.PostAsync("Image", formData);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var json = await response.Content.ReadAsStringAsync();
 
-        Assert.Equal(guid, JsonConvert.DeserializeObject<UploadImageResponse>(json).imageId);
+        Assert.Equal(guid, JsonConvert.DeserializeObject<UploadImageResponse>(json).ImageId);
 
-        _profilePictureStorageMock.Verify(m=> m.UploadImage(It.IsAny<Stream>()), Times.Once);
+        _profilePictureStorageMock.Verify(m=> m.UploadImage(guid, It.IsAny<Stream>()), Times.Once);
     }
 
     [Fact]
