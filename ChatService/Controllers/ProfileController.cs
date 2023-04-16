@@ -12,9 +12,9 @@ namespace ChatService.Controllers;
 [Route("[Controller]")]
 public class ProfileController : ControllerBase
 {
-    private readonly ProfileService _profileService;
+    private readonly IProfileService _profileService;
 
-    public ProfileController(ProfileService profileService)
+    public ProfileController(IProfileService profileService)
     {
         _profileService = profileService;
     }

@@ -12,9 +12,13 @@ public class CosmosConversationStorageTest :  IClassFixture<WebApplicationFactor
 {
     private readonly IConversationStorage _store;
 
-    private readonly Conversation _conversation1 = new Conversation("john", "ripper", 100000);
-    private readonly Conversation _conversation2 = new Conversation("mike", "john", 100200);
-    private readonly Conversation _conversation3 = new Conversation("ripper", "mike", 100010);
+    private readonly PostConversationRequest _postConversation1 = new PostConversationRequest("john", "ripper", 100000);
+    private readonly Conversation _conversation1 = new Conversation("john_ripper","john", "ripper", 100000);
+    private readonly PostConversationRequest _postConversation2 = new PostConversationRequest("mike", "john", 100200);
+    private readonly Conversation _conversation2 = new Conversation("john_mike","mike", "john", 100200);
+    private readonly PostConversationRequest _postConversation3 = new PostConversationRequest("ripper", "mike", 100010);
+    private readonly Conversation _conversation3 = new Conversation("mike_ripper","ripper", "mike", 100010);
+    
 
     public CosmosConversationStorageTest(WebApplicationFactory<Program> factory)
     {
@@ -28,38 +32,23 @@ public class CosmosConversationStorageTest :  IClassFixture<WebApplicationFactor
 
     public async Task DisposeAsync()
     {
-        await _store.DeleteConversation(_conversation1.userId1, _conversation1.userId2);
-        await _store.DeleteConversation(_conversation2.userId1, _conversation2.userId2);
-        await _store.DeleteConversation(_conversation3.userId1, _conversation3.userId2);
+        await _store.DeleteConversation(_conversation1.UserId1, _conversation1.UserId2);
+        await _store.DeleteConversation(_conversation2.UserId1, _conversation2.UserId2);
+        await _store.DeleteConversation(_conversation3.UserId1, _conversation3.UserId2);
     }
 
     [Fact]
     public async Task PostValidConversation()
     {
-        await _store.PostConversation(_conversation1);
-        Assert.Equal(_conversation1, await _store.GetConversation(_conversation1.userId1, _conversation1.userId2));
-        Assert.Equal(_conversation1, await _store.GetConversation(_conversation1.userId2, _conversation1.userId1));
-    }
-
-    [Xunit.Theory]
-    [InlineData("foo", "", 10000)]
-    [InlineData("   ", "bar", 10000)]
-    [InlineData("foo", null, 10000)]
-    [InlineData("", "bar", 10000)]
-    [InlineData(null, "bar", 10000)]
-    public async Task PostInvalidConversation(string userId1, string userId2, long unixTime)
-    {
-        var conversation = new Conversation(userId1, userId2, unixTime);
-        await Assert.ThrowsAsync<ArgumentException>(async () =>
-        {
-            await _store.PostConversation(conversation);
-        });
+        await _store.UpsertConversation(_postConversation1);
+        Assert.Equal(_conversation1, await _store.GetConversation(_postConversation1.UserId1, _postConversation1.UserId2));
+        Assert.Equal(_conversation1, await _store.GetConversation(_postConversation1.UserId2, _postConversation1.UserId1));
     }
 
     [Fact]
     public async Task GetAlreadyExistingConversation()
     {
-        Assert.Equal(new Conversation("fooz", "barz", 1000), await _store.GetConversation("fooz", "barz"));
+        Assert.Equal(new Conversation("barz_fooz","fooz", "barz", 1000), await _store.GetConversation("fooz", "barz"));
     }
 
     [Fact]
@@ -71,24 +60,24 @@ public class CosmosConversationStorageTest :  IClassFixture<WebApplicationFactor
     [Fact]
     public async Task DeleteExistingConversation()
     {
-        await _store.PostConversation(_conversation1);
-        Assert.True(await _store.DeleteConversation(_conversation1.userId1, _conversation1.userId2));
-        Assert.Null(await _store.GetConversation(_conversation1.userId1, _conversation2.userId2));
-        Assert.Null(await _store.GetConversation(_conversation1.userId2, _conversation2.userId1));
+        await _store.UpsertConversation(_postConversation1);
+        Assert.True(await _store.DeleteConversation(_postConversation1.UserId1, _postConversation1.UserId2));
+        Assert.Null(await _store.GetConversation(_postConversation1.UserId1, _postConversation1.UserId2));
+        Assert.Null(await _store.GetConversation(_postConversation1.UserId2, _postConversation1.UserId1));
     }
 
     [Fact]
     public async Task DeleteNonExistingConversation()
     {
-        Assert.False(await _store.DeleteConversation(_conversation1.userId1, _conversation2.userId2));
+        Assert.False(await _store.DeleteConversation(_postConversation1.UserId1, _postConversation1.UserId2));
     }
 
     [Fact]
     public async Task EnumerateConversationsForAGivenUser()
     {
-        await _store.PostConversation(_conversation1);
-        await _store.PostConversation(_conversation2);
-        await _store.PostConversation(_conversation3);
+        await _store.UpsertConversation(_postConversation1);
+        await _store.UpsertConversation(_postConversation2);
+        await _store.UpsertConversation(_postConversation3);
 
         List<Conversation> expectedConversationsForJohn = new List<Conversation>()
         {
@@ -112,8 +101,8 @@ public class CosmosConversationStorageTest :  IClassFixture<WebApplicationFactor
         var realConversationsForMike = await _store.EnumerateConversationsForAGivenUser("mike");
         var realConversationsForRipper = await _store.EnumerateConversationsForAGivenUser("ripper");
         
-        CollectionAssert.AreEquivalent(expectedConversationsForJohn, realConversationsForJohn.conversations); 
-        CollectionAssert.AreEquivalent(expectedConversationsForMike, realConversationsForMike.conversations); 
-        CollectionAssert.AreEquivalent(expectedConversationsForRipper, realConversationsForRipper.conversations); 
+        CollectionAssert.AreEquivalent(expectedConversationsForJohn, realConversationsForJohn.Conversations); 
+        CollectionAssert.AreEquivalent(expectedConversationsForMike, realConversationsForMike.Conversations); 
+        CollectionAssert.AreEquivalent(expectedConversationsForRipper, realConversationsForRipper.Conversations); 
     }
 }

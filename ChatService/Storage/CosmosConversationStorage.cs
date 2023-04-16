@@ -17,7 +17,7 @@ public class CosmosConversationStorage : IConversationStorage
 
     private Container container => _cosmosClient.GetDatabase("ChatService").GetContainer("Conversations");
     
-    public async Task<EnumerateConversationsStorageResponseDto?> EnumerateConversationsForAGivenUser(
+    public async Task<ListConversationsStorageResponse?> EnumerateConversationsForAGivenUser(
         string userId,
         string? continuationToken = null,
         int? limit = null,
@@ -48,25 +48,23 @@ public class CosmosConversationStorage : IConversationStorage
                     conversationsResult.Add(ToConversation(conversationEntity));
                 }
             }
-            if (response?.ContinuationToken != null)
-                return new EnumerateConversationsStorageResponseDto(conversationsResult, response.ContinuationToken);
-            return new EnumerateConversationsStorageResponseDto(conversationsResult, null);
+            return new ListConversationsStorageResponse(conversationsResult, response?.ContinuationToken);
         }
         catch (CosmosException e)
         {
             if (e.StatusCode == HttpStatusCode.NotFound)
             {
-                throw new ConversationNotFoundException($"There exists no conversations for the user with ID {userId}");
+                return null;
             }
             throw;
         }
     }
 
-    public async Task<string> PostConversation(Conversation conversation)
+    public async Task<string> UpsertConversation(PostConversationRequest conversation)
     {
-        await container.UpsertItemAsync(ToConversationEntity(conversation, conversation.userId1));
-        await container.UpsertItemAsync(ToConversationEntity(conversation, conversation.userId2));
-        return GetConversationId(conversation.userId1, conversation.userId2);
+        await container.UpsertItemAsync(ToConversationEntity(conversation, conversation.UserId1));
+        await container.UpsertItemAsync(ToConversationEntity(conversation, conversation.UserId2));
+        return GetConversationId(conversation.UserId1, conversation.UserId2);
     }
 
     public async Task<Conversation?> GetConversation(string userId1,string userId2)
@@ -87,8 +85,7 @@ public class CosmosConversationStorage : IConversationStorage
         catch (CosmosException e)
         {
             if (e.StatusCode == HttpStatusCode.NotFound)
-                throw new ConversationNotFoundException(
-                    $"There exists no conversation between {userId1} and {userId2}");
+                return null;
             throw;
         }
     }
@@ -137,7 +134,7 @@ public class CosmosConversationStorage : IConversationStorage
 
     private static Conversation ToConversation(ConversationEntity conversationEntity)
     {
-        return new Conversation(conversationEntity.userId1, conversationEntity.userId2,
+        return new Conversation(conversationEntity.id, conversationEntity.userId1, conversationEntity.userId2,
             conversationEntity.lastModifiedUnixTime);
     }
     
@@ -146,14 +143,14 @@ public class CosmosConversationStorage : IConversationStorage
         return string.CompareOrdinal(userId1, userId2) < 0 ? $"{userId1}_{userId2}" : $"{userId2}_{userId1}";
     }
     
-    private static ConversationEntity ToConversationEntity(Conversation conversation, string partitionKey)
+    private static ConversationEntity ToConversationEntity(PostConversationRequest conversation, string partitionKey)
     {
-        string conversationId = GetConversationId(conversation.userId1, conversation.userId2);
+        string conversationId = GetConversationId(conversation.UserId1, conversation.UserId2);
         return new ConversationEntity(
             partitionKey: partitionKey,
             id:conversationId,
-            userId1: conversation.userId1,
-            userId2: conversation.userId2,
-            lastModifiedUnixTime: conversation.lastModifiedUnixTime);
+            userId1: conversation.UserId1,
+            userId2: conversation.UserId2,
+            lastModifiedUnixTime: conversation.LastModifiedUnixTime);
     }
 }

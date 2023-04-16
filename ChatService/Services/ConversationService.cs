@@ -5,7 +5,7 @@ using ChatService.Storage;
 
 namespace ChatService.Services;
 
-public class ConversationService
+public class ConversationService : IConversationService
 {
     private readonly IConversationStorage _conversationStorage;
     private readonly IMessageStorage _messageStorage;
@@ -24,26 +24,34 @@ public class ConversationService
         {
             throw new ArgumentException($"Invalid conversation ID {conversationId}");
         }
-        if (String.IsNullOrWhiteSpace(sendMessageRequest.text) ||
-            String.IsNullOrWhiteSpace(sendMessageRequest.senderUsername) ||
-            String.IsNullOrWhiteSpace(sendMessageRequest.messageId))
+        if (String.IsNullOrWhiteSpace(sendMessageRequest.Text) ||
+            String.IsNullOrWhiteSpace(sendMessageRequest.SenderUsername) ||
+            String.IsNullOrWhiteSpace(sendMessageRequest.MessageId))
         {
             throw new ArgumentException($"Invalid message {sendMessageRequest}", nameof(sendMessageRequest));
         }
+
+        var conversation = await _conversationStorage.GetConversation(conversationId);
+        if (conversation == null)
+        {
+            throw new ConversationNotFoundException($"There exists no conversation with ID {conversationId}");
+        }
         
         var message = new Message(
-            sendMessageRequest.messageId,
-            sendMessageRequest.text,
-            sendMessageRequest.senderUsername,
+            sendMessageRequest.MessageId,
+            sendMessageRequest.Text,
+            sendMessageRequest.SenderUsername,
             conversationId,
             DateTimeOffset.UtcNow.ToUnixTimeSeconds()
         );
         
         await _messageStorage.PostMessageToConversation(message);
+        await _conversationStorage.UpsertConversation(new PostConversationRequest(conversation.UserId1,
+            conversation.UserId2, message.unixTime));
         return message;
     }
 
-    public async Task<EnumerateMessagesStorageResponseDto?> EnumerateMessagesInAConversation(
+    public async Task<ListMessagesStorageResponseDto> EnumerateMessagesInAConversation(
         string conversationId,
         string? continuationToken = null,
         int? limit = null,
@@ -54,58 +62,72 @@ public class ConversationService
             throw new ArgumentException($"Invalid conversation ID {conversationId}");
         }
 
-        await _conversationStorage.GetConversation(conversationId);
+        if (await _conversationStorage.GetConversation(conversationId) == null)
+        {
+            throw new ConversationNotFoundException($"There exists no conversation with ID {conversationId}");
+        }
         var response = await _messageStorage.EnumerateMessagesFromAGivenConversation(conversationId,
             continuationToken, limit, lastSeenMessageTime);
-        return new EnumerateMessagesStorageResponseDto(response.messages, HttpUtility.UrlEncode(response.continuationToken));
+        if (response == null)
+        {
+            throw new MessageNotFoundException(
+                $"There are no messages for the conversation with conversation ID {conversationId}");
+        }
+
+        return response;
     }
 
-    public async Task<StartConversationResponseDto> StartConversation(StartConversationRequestDto startConversationRequestDto)
+    public async Task<StartConversationResponse> StartConversation(StartConversationRequest startConversationRequestDto)
     {
-        var userId1 = startConversationRequestDto.participants[0];
-        var userId2 = startConversationRequestDto.participants[1];
+        var userId1 = startConversationRequestDto.Participants[0];
+        var userId2 = startConversationRequestDto.Participants[1];
         if (String.IsNullOrWhiteSpace(userId1) ||
             String.IsNullOrWhiteSpace(userId2))
         {
             throw new ArgumentException("Invalid user ID");
         }
-        await _profileStorage.GetProfile(userId1);
-        await _profileStorage.GetProfile(userId2);
 
-        var conversation = new Conversation(userId1, userId2,
-            DateTimeOffset.UtcNow.ToUnixTimeSeconds());
-        try
+        if (await _profileStorage.GetProfile(userId1) == null)
         {
-            await _conversationStorage.GetConversation(conversation.userId1, conversation.userId2);
+            throw new UserNotFoundException($"The user with username {userId1} was not found");
+        }
+        if (await _profileStorage.GetProfile(userId2) == null)
+        {
+            throw new UserNotFoundException($"The user with username {userId2} was not found");
+        }
+        
+        var conversation = new PostConversationRequest(userId1, userId2,
+            DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+
+        if (await _conversationStorage.GetConversation(conversation.UserId1, conversation.UserId2) == null) {
             throw new ConversationConflictException(
                 $"There already exists a conversation between {userId1} and {userId2}");
         }
-        catch (ConversationNotFoundException)
+
+        string conversationId = await _conversationStorage.UpsertConversation(conversation);
+
+        var sendMessageRequest = startConversationRequestDto.FirstMessage;
+        var message = new Message(
+            sendMessageRequest.MessageId,
+            sendMessageRequest.Text,
+            sendMessageRequest.SenderUsername,
+            conversationId,
+            conversation.LastModifiedUnixTime
+        );
+        if (String.IsNullOrWhiteSpace(message.conversationId) ||
+            String.IsNullOrWhiteSpace(message.text) ||
+            String.IsNullOrWhiteSpace(message.senderUsername) ||
+            String.IsNullOrWhiteSpace(message.messageId))
         {
-            string conversationId = await _conversationStorage.PostConversation(conversation);
-
-            var sendMessageRequest = startConversationRequestDto.firstMessage;
-            var message = new Message(
-                sendMessageRequest.messageId,
-                sendMessageRequest.text,
-                sendMessageRequest.senderUsername,
-                conversationId,
-                conversation.lastModifiedUnixTime
-            );
-            if (String.IsNullOrWhiteSpace(message.conversationId) ||
-                String.IsNullOrWhiteSpace(message.text) ||
-                String.IsNullOrWhiteSpace(message.senderUsername) ||
-                String.IsNullOrWhiteSpace(message.messageId))
-            {
-                throw new ArgumentException($"Invalid message {message}", nameof(message));
-            }
-
-            await _messageStorage.PostMessageToConversation(message);
-            return new StartConversationResponseDto(conversationId, conversation.lastModifiedUnixTime);
+            throw new ArgumentException($"Invalid message {message}", nameof(message));
         }
+
+        await _messageStorage.PostMessageToConversation(message);
+        string[] participants = new[] { userId1, userId2 };
+        return new StartConversationResponse(conversationId,participants, conversation.LastModifiedUnixTime);
     }
 
-    public async Task<EnumerateConversationsStorageResponseDto> EnumerateConversationsOfAGivenUser(   
+    public async Task<ListConversationsServiceResponse> EnumerateConversationsOfAGivenUser(   
         string userId,
         string? continuationToken = null,
         int? limit = null,
@@ -116,11 +138,40 @@ public class ConversationService
             throw new ArgumentException($"Invalid user ID");
         }
 
-        await _profileStorage.GetProfile(userId);
+        if (await _profileStorage.GetProfile(userId) == null)
+        {
+            throw new UserNotFoundException($"The user with username {userId} was not found");
+        }
         var response =
             await _conversationStorage.EnumerateConversationsForAGivenUser(userId, continuationToken, limit,
                 lastSeenConversationTime);
-        return new EnumerateConversationsStorageResponseDto(response.conversations,
-            HttpUtility.UrlEncode(response.continuationToken));
+        if (response == null)
+        {
+            throw new ConversationNotFoundException($"There exists no conversations for the user with ID {userId}");
+        }
+
+        var conversations = response.Conversations;
+        List<ListConversationsResponseItem> userConversations = new List<ListConversationsResponseItem>();
+        foreach (var conversation in conversations)
+        {
+            userConversations.Add(await ToUserConversation(conversation, userId));
+        }
+
+        return new ListConversationsServiceResponse(userConversations, response.ContinuationToken);
+    }
+
+    private async Task<ListConversationsResponseItem> ToUserConversation(Conversation conversation, string userId)
+    {
+        Profile? recipient;
+        if (conversation.UserId1 != userId)
+        {
+            recipient = await _profileStorage.GetProfile(conversation.UserId1);
+        }
+        else
+        {
+            recipient = await _profileStorage.GetProfile(conversation.UserId2);
+        }
+
+        return new ListConversationsResponseItem(conversation.ConversationId, conversation.LastModifiedUnixTime, recipient);
     }
 }

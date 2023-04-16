@@ -1,4 +1,5 @@
 using System.Net;
+using System.Web;
 using ChatService.Dtos;
 using ChatService.Exceptions;
 using ChatService.Services;
@@ -12,8 +13,8 @@ namespace ChatService.Controllers;
 [Route("[Controller]")]
 public class ConversationController : ControllerBase
 {
-    private readonly ConversationService _conversationService;
-    public ConversationController(ConversationService conversationService)
+    private readonly IConversationService _conversationService;
+    public ConversationController(IConversationService conversationService)
     {
         _conversationService = conversationService;
     }
@@ -30,12 +31,13 @@ public class ConversationController : ControllerBase
         }
         catch (ArgumentException exception)
         {
-            return BadRequest(exception.Message);
+            return BadRequest($"Invalid message {sendMessageRequest}");
         }
     }
+    
 
     [HttpGet("{conversationId}/messages")]
-    public async Task<ActionResult<EnumerateMessagesControllerResponseeDto>> EnumerateMessagesInAConversation(
+    public async Task<ActionResult<ListMessageResponse>> EnumerateMessagesInAConversation(
         [FromRoute] string conversationId,
         [FromQuery] string? continuationToken = null,
         [FromQuery] int? limit = null,
@@ -45,34 +47,35 @@ public class ConversationController : ControllerBase
         {
             var messagesStorageResponseDto = await _conversationService.EnumerateMessagesInAConversation(conversationId,
                 continuationToken, limit, lastSeenMessageTime);
+            var encodedContinuationToken = HttpUtility.UrlDecode(messagesStorageResponseDto.ContinuationToken);
             var nextUri =
-                $"/api/conversations/{conversationId}/messages?&limit={limit}&lastSeenMessageTime={lastSeenMessageTime}&continuationToken={messagesStorageResponseDto.continuationToken}";
-            return Ok(new EnumerateMessagesControllerResponseeDto(messagesStorageResponseDto.messages, nextUri));
+                $"/api/conversations/{conversationId}/messages?&limit={limit}&lastSeenMessageTime={lastSeenMessageTime}&continuationToken={encodedContinuationToken}";
+            return Ok(new ListMessageResponse(messagesStorageResponseDto.Messages, nextUri));
         }
-        catch (ArgumentException exception)
+        catch (ArgumentException)
         {
-            return BadRequest(exception.Message);
+            return BadRequest($"Invalid conversation ID {conversationId}");
         }
-        catch (ConversationNotFoundException exception)
+        catch (ConversationNotFoundException)
         {
-            return NotFound(exception.Message);
+            return NotFound($"There exists no conversation with ID {conversationId}");
         }
         catch (MessageNotFoundException)
         {
-            return Ok(new EnumerateMessagesControllerResponseeDto(new List<Message>(), null));
+            return Ok(new ListMessageResponse(new List<ListMessageResponseItem>(), null));
         }
     }
 
     [HttpPost]
-    public async Task<ActionResult<StartConversationResponseDto>> StartConversation(
-        [FromBody] StartConversationRequestDto startConversationRequestDto)
+    public async Task<ActionResult<StartConversationResponse>> StartConversation(
+        [FromBody] StartConversationRequest startConversationRequestDto)
     {
         try
         {
             var startConversationResponseDto =
                 await _conversationService.StartConversation(startConversationRequestDto);
             return CreatedAtAction(nameof(EnumerateConversationsOfAGivenUser),
-                new { conversationId = startConversationResponseDto.conversationId },
+                new { conversationId = startConversationResponseDto.Id },
                 startConversationResponseDto);
         }
         catch (ArgumentException exception)
@@ -90,7 +93,7 @@ public class ConversationController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<EnumerateConversationsOfAGivenUserDto>> EnumerateConversationsOfAGivenUser(       
+    public async Task<ActionResult<ListConversationsResponse>> EnumerateConversationsOfAGivenUser(       
         [FromRoute] string userId,
         [FromQuery] string? continuationToken = null,
         [FromQuery] int? limit = null,
@@ -102,21 +105,21 @@ public class ConversationController : ControllerBase
                 await _conversationService.EnumerateConversationsOfAGivenUser(userId, continuationToken, limit,
                     lastSeenConversationTime);
             var nextUri =
-                $"/api/conversations?username={userId}&limit={limit}&lastSeenConversationTime={lastSeenConversationTime}&continuationToken={conversationsStorageResponseDto.continuationToken}";
-            return Ok(new EnumerateConversationsOfAGivenUserDto(conversationsStorageResponseDto.conversations,
+                $"/api/conversations?username={userId}&limit={limit}&lastSeenConversationTime={lastSeenConversationTime}&continuationToken={conversationsStorageResponseDto.ContinuationToken}";
+            return Ok(new ListConversationsResponse(conversationsStorageResponseDto.Conversations,
                 nextUri));
         }
-        catch (ArgumentException exception)
+        catch (ArgumentException)
         {
-            return BadRequest(exception.Message);
+            return BadRequest($"Invalid user ID");
         }
-        catch (ConversationNotFoundException exception)
+        catch (ConversationNotFoundException)
         {
-            return NotFound(exception.Message);
+            return Ok(new ListConversationsResponse(new List<ListConversationsResponseItem>()));
         }
-        catch (MessageNotFoundException)
+        catch (UserNotFoundException)
         {
-            return Ok(new EnumerateConversationsOfAGivenUserDto(new List<Conversation>(), null));
+            return NotFound($"The user with username {userId} was not found");
         }
     }
 }

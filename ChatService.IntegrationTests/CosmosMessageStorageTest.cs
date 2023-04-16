@@ -37,31 +37,12 @@ public class CosmosMessageStorageTest : IClassFixture<WebApplicationFactory<Prog
         await _store.PostMessageToConversation(_message1);
         Assert.Equal(_message1, await _store.GetMessage(_message1.conversationId, _message1.messageId));
     }
-
-    [Xunit.Theory]
-    [InlineData("", "hello", "foo", "message id", 1000)]
-    [InlineData("  ", "hello", "foo", "message id", 1000)]
-    [InlineData("foo_bar", null, "foo", "message id", 1000)]
-    [InlineData("foo_bar", "hello", " ", "message id", 1000)]
-    [InlineData("foo_bar", "hello", "foo", "   ", 1000)]
-    [InlineData("foo_bar", "hello", "foo", null, 1000)]
-    [InlineData("foo_bar", "", "foo", "message id", 1000)]
-    public async Task PostInvalidMessage(string converstionId, string text, string senderUsername, string messageId, long unixTime)
-    {
-        var conversation = new Message(messageId, text, senderUsername, converstionId, unixTime);
-        await Assert.ThrowsAsync<ArgumentException>(async () =>
-        {
-            await _store.PostMessageToConversation(conversation);
-        });
-    }
-
+    
     [Fact]
     public async Task GetAlreadyExistingMessages()
     {
-        Message expectedAlreadyExistingMessage1 = new Message("TestMessage", "My name is foo!", "foo", "foo_bar", 2000);
-        Message expectedAlreadyExistingMessage1Flipped = new Message("TestMessage", "My name is foo!", "foo", "bar_foo", 2000);
-        Assert.Equal(expectedAlreadyExistingMessage1, await _store.GetMessage("foo_bar", "TestMessage"));
-        Assert.Equal(expectedAlreadyExistingMessage1Flipped, await _store.GetMessage("bar_foo", "TestMessage"));
+        Message expectedAlreadyExistingMessage = new Message("TestMessage", "My name is fooz!", "fooz", "barz_fooz", 2000);
+        Assert.Equal(expectedAlreadyExistingMessage, await _store.GetMessage("barz_fooz", "TestMessage"));
     }
 
     [Fact]
@@ -76,7 +57,6 @@ public class CosmosMessageStorageTest : IClassFixture<WebApplicationFactory<Prog
         await _store.PostMessageToConversation(_message1);
         Assert.True(await _store.DeleteMessage(_message1.conversationId, _message1.messageId));
         Assert.Null(await _store.GetMessage(_message1.conversationId, _message1.messageId));
-        Assert.Null(await _store.GetMessage("mike_foo", _message1.messageId));
     }
 
     [Fact]
@@ -91,13 +71,13 @@ public class CosmosMessageStorageTest : IClassFixture<WebApplicationFactory<Prog
         await _store.PostMessageToConversation(_message1);
         await _store.PostMessageToConversation(_message2);
 
-        List<Message> expectedMessages = new List<Message>()
+        List<ListMessageResponseItem> expectedMessages = new List<ListMessageResponseItem>()
         {
-            _message1,
-            _message2
+            new ListMessageResponseItem(_message1.text, _message1.senderUsername, _message1.unixTime),
+            new ListMessageResponseItem(_message2.text, _message2.senderUsername, _message2.unixTime)
         };
 
         var realMessages = await _store.EnumerateMessagesFromAGivenConversation("foo_mike");
-        CollectionAssert.AreEquivalent(expectedMessages, realMessages.messages);
+        CollectionAssert.AreEquivalent(expectedMessages, realMessages.Messages);
     }
 }

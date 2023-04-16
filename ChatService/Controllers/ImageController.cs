@@ -12,9 +12,9 @@ namespace ChatService.Controllers;
 [Route("[Controller]")]
 public class ImageController : ControllerBase
 {
-    private readonly ImageService _imageService;
+    private readonly IImageService _imageService;
 
-    public ImageController(ImageService imageService)
+    public ImageController(IImageService imageService)
     {
         _imageService = imageService;
     }

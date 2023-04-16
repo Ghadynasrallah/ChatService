@@ -17,7 +17,7 @@ public class CosmosMessageStorage : IMessageStorage
 
     private Container container => _cosmosClient.GetDatabase("ChatService").GetContainer("Messages");
     
-    public async Task<EnumerateMessagesStorageResponseDto?> EnumerateMessagesFromAGivenConversation(
+    public async Task<ListMessagesStorageResponseDto?> EnumerateMessagesFromAGivenConversation(
         string conversationId,
         string? continuationToken = null,
         int? limit = null,
@@ -25,7 +25,7 @@ public class CosmosMessageStorage : IMessageStorage
     {
         try
         {
-            List<Message> messagesResult = new List<Message>();
+            List<ListMessageResponseItem> messagesResult = new List<ListMessageResponseItem>();
             var queryOptions = new QueryRequestOptions
             {
                 PartitionKey = new PartitionKey(conversationId),
@@ -45,18 +45,18 @@ public class CosmosMessageStorage : IMessageStorage
                 response = await iterator.ReadNextAsync();
                 foreach (var messageEntity in response)
                 {
-                    messagesResult.Add(ToMessage(messageEntity));
+                    messagesResult.Add(ToMessageResponse(messageEntity));
                 }
             }
 
             if (response != null)
-                return new EnumerateMessagesStorageResponseDto(messagesResult, response.ContinuationToken);
-            return new EnumerateMessagesStorageResponseDto(messagesResult, null);
+                return new ListMessagesStorageResponseDto(messagesResult, response.ContinuationToken);
+            return new ListMessagesStorageResponseDto(messagesResult, null);
         }
         catch (CosmosException e)
         {
             if (e.StatusCode == HttpStatusCode.NotFound)
-                throw new MessageNotFoundException($"The are no messages for the conversation with id {conversationId}");
+                return null;
             throw;
         }
     }
@@ -114,6 +114,10 @@ public class CosmosMessageStorage : IMessageStorage
             messageEntity.partitionKey, messageEntity.unixTime);
     }
 
+    private static ListMessageResponseItem ToMessageResponse(MessageEntity messageEntity)
+    {
+        return new ListMessageResponseItem(messageEntity.text, messageEntity.senderUsername, messageEntity.unixTime);
+    }
     private static MessageEntity ToMessageEntity(Message message)
     {
         return new MessageEntity(message.conversationId, message.messageId, message.text, message.senderUsername,
