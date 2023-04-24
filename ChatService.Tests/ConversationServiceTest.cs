@@ -1,11 +1,9 @@
+using System.Runtime.InteropServices;
 using ChatService.Dtos;
 using ChatService.Exceptions;
 using ChatService.Services;
 using ChatService.Storage;
-using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.AspNetCore.TestHost;
 using Moq;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace ChatService.Tests;
 
@@ -20,31 +18,32 @@ public class ConversationServiceTest : IClassFixture<ConversationServiceTest>
     {
         _conversationService = new ConversationService(_conversationStorageMock.Object, _messageStorageMock.Object, _profileStorageMock.Object);
     }
+
+    private readonly Conversation _conversation1 = new Conversation("bar_foo", "foo", "bar", 1000);
     
     [Fact]
     public async Task SendMessageToConversation_Success()
     {
         // Arrange
         var sendMessageRequest = new SendMessageRequest(Guid.NewGuid().ToString(), "foo", "Hello");
-        var conversation = new Conversation("bar_foo", "foo", "bar", 1000);
 
-        _conversationStorageMock.Setup(x => x.GetConversation(conversation.ConversationId)).ReturnsAsync(conversation);
+        _conversationStorageMock.Setup(x => x.GetConversation(_conversation1.ConversationId)).ReturnsAsync(_conversation1);
         _messageStorageMock.Setup(x => x.PostMessageToConversation(It.IsAny<Message>())).Returns(Task.CompletedTask);
-        _conversationStorageMock.Setup(x => x.UpsertConversation(It.IsAny<PostConversationRequest>())).ReturnsAsync(conversation.ConversationId);
+        _conversationStorageMock.Setup(x => x.UpsertConversation(It.IsAny<PostConversationRequest>())).ReturnsAsync(_conversation1.ConversationId);
 
         // Act
-        var result = await _conversationService.SendMessageToConversation(conversation.ConversationId, sendMessageRequest);
+        var result = await _conversationService.SendMessageToConversation(_conversation1.ConversationId, sendMessageRequest);
 
         // Assert
         Assert.Equal(sendMessageRequest.MessageId, result.messageId);
         Assert.Equal(sendMessageRequest.Text, result.text);
         Assert.Equal(sendMessageRequest.SenderUsername, result.senderUsername);
-        Assert.Equal(conversation.ConversationId, result.conversationId);
+        Assert.Equal(_conversation1.ConversationId, result.conversationId);
         
         //Verify
-        _conversationStorageMock.Verify(m=> m.UpsertConversation(new PostConversationRequest(conversation.UserId1, conversation.UserId2, result.unixTime)), Times.Once);
+        _conversationStorageMock.Verify(m=> m.UpsertConversation(new PostConversationRequest(_conversation1.UserId1, _conversation1.UserId2, result.unixTime)), Times.Once);
         _messageStorageMock.Verify(m=>m.PostMessageToConversation(result), Times.Once);
-        _conversationStorageMock.Verify(m=>m.GetConversation(conversation.ConversationId), Times.Once);
+        _conversationStorageMock.Verify(m=>m.GetConversation(_conversation1.ConversationId), Times.Once);
     }
 
     [Theory]
@@ -68,19 +67,265 @@ public class ConversationServiceTest : IClassFixture<ConversationServiceTest>
     {
         // Arrange
         var sendMessageRequest = new SendMessageRequest(Guid.NewGuid().ToString(), "foo", "Hello");
-        var conversation = new Conversation("bar_foo", "foo", "bar", 1000);
 
-        _conversationStorageMock.Setup(x => x.GetConversation(conversation.ConversationId)).ReturnsAsync((Conversation?)null);
+        _conversationStorageMock.Setup(x => x.GetConversation(_conversation1.ConversationId)).ReturnsAsync((Conversation?)null);
         _messageStorageMock.Setup(x => x.PostMessageToConversation(It.IsAny<Message>())).Returns(Task.CompletedTask);
-        _conversationStorageMock.Setup(x => x.UpsertConversation(It.IsAny<PostConversationRequest>())).ReturnsAsync(conversation.ConversationId);
+        _conversationStorageMock.Setup(x => x.UpsertConversation(It.IsAny<PostConversationRequest>())).ReturnsAsync(_conversation1.ConversationId);
         
         // Assert
         await Assert.ThrowsAsync<ConversationNotFoundException>(() =>
-            _conversationService.SendMessageToConversation(conversation.ConversationId, sendMessageRequest));
+            _conversationService.SendMessageToConversation(_conversation1.ConversationId, sendMessageRequest));
         
         //Verify
         _conversationStorageMock.Verify(m=> m.UpsertConversation(It.IsAny<PostConversationRequest>()), Times.Never);
         _messageStorageMock.Verify(m=>m.PostMessageToConversation(It.IsAny<Message>()), Times.Never);
-        _conversationStorageMock.Verify(m=>m.GetConversation(conversation.ConversationId), Times.Once);
+        _conversationStorageMock.Verify(m=>m.GetConversation(_conversation1.ConversationId), Times.Once);
+    }
+
+    [Fact]
+    public async Task EnumerateMessages_Success()
+    {
+        //Arrange
+        List<Message> messages = new List<Message>()
+        {
+            new Message(Guid.NewGuid().ToString(), "Hey bar", _conversation1.UserId1,
+            _conversation1.ConversationId, 1000),
+            
+            new Message(Guid.NewGuid().ToString(), "Hey foo", _conversation1.UserId2,
+                _conversation1.ConversationId, 1001), 
+            
+            new Message(Guid.NewGuid().ToString(), "What's up", _conversation1.UserId1,
+                _conversation1.ConversationId, 1002)
+        };
+
+        List<ListMessageResponseItem> messageResponseItems = new List<ListMessageResponseItem>
+        {
+            new ListMessageResponseItem(messages[0].text, messages[0].senderUsername, messages[0].unixTime),
+            new ListMessageResponseItem(messages[1].text, messages[1].senderUsername, messages[1].unixTime),
+            new ListMessageResponseItem(messages[2].text, messages[2].senderUsername, messages[2].unixTime),
+        };
+            
+        var messagesStorageResponse = new ListMessagesStorageResponseDto(messages);
+        var messagesServiceResponse = new ListMessageServiceResponseDto(messageResponseItems);
+
+        _messageStorageMock.Setup(x => x.EnumerateMessagesFromAGivenConversation(_conversation1.ConversationId, null, null, null))
+            .ReturnsAsync(messagesStorageResponse);
+        _conversationStorageMock.Setup(x => x.GetConversation(_conversation1.ConversationId))
+            .ReturnsAsync(_conversation1);
+        
+        //Assert
+        var conversationServiceResponse =
+            await _conversationService.EnumerateMessagesInAConversation(_conversation1.ConversationId);
+        Assert.Equal(conversationServiceResponse.Messages, messagesServiceResponse.Messages);
+        Assert.Equal(conversationServiceResponse.ContinuationToken, messagesServiceResponse.ContinuationToken);
+        
+        //Verify
+        _messageStorageMock.Verify(m=> m.EnumerateMessagesFromAGivenConversation(_conversation1.ConversationId, null, null, null), Times.Once);
+    }
+
+    [Theory]
+    [InlineData("   ")]
+    [InlineData(null)]
+    [InlineData("")]
+    public async Task EnumerateMessages_InvalidArg(string conversationId)
+    {
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            _conversationService.EnumerateMessagesInAConversation(conversationId));
+    }
+
+    [Fact]
+    public async Task EnumerateMessages_ConversationDoesNotExist()
+    {
+        _conversationStorageMock.Setup(m => m.GetConversation(_conversation1.ConversationId))
+            .ReturnsAsync((Conversation?)null);
+        await Assert.ThrowsAsync<ConversationNotFoundException>(() =>
+            _conversationService.EnumerateMessagesInAConversation(_conversation1.ConversationId));
+    }
+
+    [Fact]
+    public async Task EnumerateMessages_NoMessages()
+    {
+        _conversationStorageMock.Setup(m => m.GetConversation(_conversation1.ConversationId))
+            .ReturnsAsync(_conversation1);
+        _messageStorageMock.Setup(m=>m.EnumerateMessagesFromAGivenConversation(_conversation1.ConversationId, null, null, null))
+            .ReturnsAsync((ListMessagesStorageResponseDto?)null);
+
+        await Assert.ThrowsAsync<MessageNotFoundException>(() =>
+            _conversationService.EnumerateMessagesInAConversation(_conversation1.ConversationId));
+    }
+    
+    [Fact]
+    public async Task StartConversation_Success()
+    {
+        //Arrange
+        var sendMessageRequest = new SendMessageRequest(Guid.NewGuid().ToString(), _conversation1.UserId1, "hello");
+        var startConversationRequest = new StartConversationRequest(new []{_conversation1.UserId1, _conversation1.UserId2}, sendMessageRequest);
+        var profile1 = new Profile("foo", "foo", "foo", null);
+        var profile2 = new Profile("bar", "nar", "bar", null);
+
+        _profileStorageMock.Setup(m => m.GetProfile("foo")).ReturnsAsync(profile1);
+        _profileStorageMock.Setup(m => m.GetProfile("bar")).ReturnsAsync(profile2);
+        _conversationStorageMock.Setup(m => m.GetConversation(_conversation1.UserId1, _conversation1.UserId2))
+            .ReturnsAsync((Conversation?)null);
+        _conversationStorageMock.Setup(m=>m.UpsertConversation(It.IsAny<PostConversationRequest>())).ReturnsAsync("bar_foo");
+
+        var startConversationResponse = new StartConversationResponse(_conversation1.ConversationId,
+            new [] { _conversation1.UserId1, _conversation1.UserId2 }, It.IsAny<long>());
+        var actualResult = await _conversationService.StartConversation(startConversationRequest);
+        
+        //Assert
+        Assert.Equal(actualResult.Id, startConversationResponse.Id);
+        Assert.Equal(actualResult.Participants, startConversationResponse.Participants);
+        
+        //Verify
+        var message = new Message(sendMessageRequest.MessageId, sendMessageRequest.Text,
+            sendMessageRequest.SenderUsername, "bar_foo", actualResult.LastModifiedDateUtc);
+        _messageStorageMock.Verify(m=> m.PostMessageToConversation(message), Times.Once);
+        var postConversationRequest= new PostConversationRequest(_conversation1.UserId1, _conversation1.UserId2,
+            actualResult.LastModifiedDateUtc);
+        _conversationStorageMock.Verify(m=>m.UpsertConversation(postConversationRequest), Times.Once);
+        _conversationStorageMock.Verify(m=>m.GetConversation(_conversation1.UserId1, _conversation1.UserId2), Times.Once);
+    }
+
+    [Theory]
+    [InlineData("  ", "foo", "hello", "foo", "bar")]
+    [InlineData(null, "foo", "hello", "foo", "bar")]
+    [InlineData("test", "", "hello", "foo", "bar")]
+    [InlineData("test", "  ", "hello", "foo", "bar")]
+    [InlineData("test", null, "hello", "foo", "bar")]
+    [InlineData("test", "foo", "  ", "foo", "bar")]
+    [InlineData("test", "foo", "", "foo", "bar")]
+    [InlineData("test", "foo", null, "foo", "bar")]
+    [InlineData("test", "foo", "hello", "", "bar")]
+    [InlineData("test", "foo", "hello", "  ", "bar")]
+    [InlineData("test", "foo", "hello", null, "bar")]
+    [InlineData("test", "foo", "hello", "foo", "")]
+    [InlineData("test", "foo", "hello", "foo", "  ")]
+    [InlineData("test", "foo", "hello", "foo", null)]
+    public async Task StartConversation_InvalidArgs(string messageId, string senderUsername, string text, string userId1, string userId2) 
+    {
+        var sendMessageRequest = new SendMessageRequest(messageId, senderUsername, text);
+        var startConversationRequest = new StartConversationRequest(new []{userId1, userId2}, sendMessageRequest);
+        await Assert.ThrowsAsync<ArgumentException>(() => _conversationService.StartConversation(startConversationRequest));
+    }
+
+    [Fact]
+    public async Task StartConversation_InvalidNumberOfUsers()
+    {
+        var sendMessageRequest = new SendMessageRequest(Guid.NewGuid().ToString(), _conversation1.UserId1, "Hello");
+        string[] participants = new string[] { "foo", "bar", "mike" };
+        var startConversationRequest = new StartConversationRequest(participants, sendMessageRequest);
+        await Assert.ThrowsAsync<ArgumentException>(() => _conversationService.StartConversation(startConversationRequest));
+    }
+
+    [Fact]
+    public async Task StartConversation_UserNotFound()
+    {
+        //Arrange
+        var sendMessageRequest = new SendMessageRequest(Guid.NewGuid().ToString(), _conversation1.UserId1, "Hello");
+        var startConversationRequest =
+            new StartConversationRequest(new [] { _conversation1.UserId1, _conversation1.UserId2 }, sendMessageRequest);
+        var profile1 = new Profile(_conversation1.UserId1, _conversation1.UserId1, _conversation1.UserId1, null);
+        var profile2 = new Profile(_conversation1.UserId2, _conversation1.UserId2, _conversation1.UserId2, null);
+
+        _profileStorageMock.Setup(m => m.GetProfile(profile1.Username)).ReturnsAsync((Profile?)null);
+        _profileStorageMock.Setup(m => m.GetProfile(profile2.Username)).ReturnsAsync((Profile?)null);
+        _conversationStorageMock.Setup(m => m.GetConversation(_conversation1.UserId1, _conversation1.UserId2))
+            .ReturnsAsync((Conversation?)null);
+        _conversationStorageMock.Setup(m=>m.UpsertConversation(It.IsAny<PostConversationRequest>())).ReturnsAsync("bar_foo");
+        
+        //Assert
+        await Assert.ThrowsAsync<UserNotFoundException>(() => _conversationService.StartConversation(startConversationRequest));
+        
+        //Arrange
+        _profileStorageMock.Setup(m => m.GetProfile(profile1.Username)).ReturnsAsync(profile1);
+        
+        //Assert
+        await Assert.ThrowsAsync<UserNotFoundException>(() =>
+            _conversationService.StartConversation(startConversationRequest));
+    }
+
+    [Fact]
+    public async Task StartConversation_ConversationAlreadyExists()
+    {
+        //Arrange
+        var sendMessageRequest = new SendMessageRequest(Guid.NewGuid().ToString(), _conversation1.UserId1, "Hello");
+        var startConversationRequest = new StartConversationRequest(new [] { _conversation1.UserId1, _conversation1.UserId2 }, sendMessageRequest);
+        var profile1 = new Profile("foo", "foo", "foo", null);
+        var profile2 = new Profile("bar", "nar", "bar", null);
+
+        _profileStorageMock.Setup(m => m.GetProfile(_conversation1.UserId1)).ReturnsAsync(profile1);
+        _profileStorageMock.Setup(m => m.GetProfile(_conversation1.UserId2)).ReturnsAsync(profile2);
+        _conversationStorageMock.Setup(m => m.GetConversation(profile1.Username, profile2.Username))
+            .ReturnsAsync(_conversation1);
+        
+        //Assert
+        await Assert.ThrowsAsync<ConversationConflictException>(() =>
+            _conversationService.StartConversation(startConversationRequest));
+        
+        //Verify
+        _profileStorageMock.Verify(m=>m.GetProfile(profile1.Username), Times.Once);
+        _profileStorageMock.Verify(m=>m.GetProfile(profile2.Username), Times.Once);
+        _conversationStorageMock.Verify(m=>m.GetConversation(profile1.Username, profile2.Username), Times.Once);
+    }
+    [Fact]
+    public async Task EnumerateConversations()
+    {
+        //Arrange
+        var profile1 = new Profile("foo", "foo", "foo", null);
+        var profile2 = new Profile("mike", "mike", "mike", null);
+        var profile3 = new Profile("bar", "bar", "bar", null);
+        var conversation2 = new Conversation("foo_mike", "foo", "mike", 100);
+        List<Conversation> conversations = new List<Conversation>()
+        {
+            _conversation1, conversation2
+        };
+
+        List<ListConversationsResponseItem> conversationsResponseItems = new List<ListConversationsResponseItem>()
+        {
+            new ListConversationsResponseItem(_conversation1.ConversationId, _conversation1.LastModifiedUnixTime, profile3),
+            new ListConversationsResponseItem(conversation2.ConversationId, conversation2.LastModifiedUnixTime, profile2)
+        };
+
+        _conversationStorageMock.Setup(m => m.EnumerateConversationsForAGivenUser(profile1.Username, null, null, null))
+            .ReturnsAsync(new ListConversationsStorageResponse(conversations));
+        _profileStorageMock.Setup(m => m.GetProfile(profile1.Username)).ReturnsAsync(profile1);
+        _profileStorageMock.Setup(m => m.GetProfile(profile2.Username)).ReturnsAsync(profile2);
+        _profileStorageMock.Setup(m => m.GetProfile(profile3.Username)).ReturnsAsync(profile3);
+        
+        //Assert
+        var response = await _conversationService.EnumerateConversationsOfAGivenUser(profile1.Username);
+        Assert.Equal(response.Conversations, conversationsResponseItems);
+    }
+
+    [Theory]
+    [InlineData("   ")]
+    [InlineData(null)]
+    [InlineData("")]
+    public async Task EnumerateConversations_InvalidArgs(string userId)
+    {
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            _conversationService.EnumerateConversationsOfAGivenUser(userId));
+    }
+
+    [Fact]
+    public async Task EnumerateConversations_UserDoesNotExist()
+    {
+        var profile1 = new Profile(_conversation1.UserId1, _conversation1.UserId1, _conversation1.UserId1, null);
+        _profileStorageMock.Setup(m => m.GetProfile(profile1.Username)).ReturnsAsync((Profile?)null);
+        await Assert.ThrowsAsync<UserNotFoundException>(() =>
+            _conversationService.EnumerateConversationsOfAGivenUser(profile1.Username));
+    }
+
+    [Fact]
+    public async Task EnumerateConversations_NoConversationsExist()
+    {
+        var profile1 = new Profile(_conversation1.UserId1, _conversation1.UserId1, _conversation1.UserId1, null);
+        _profileStorageMock.Setup(m => m.GetProfile(profile1.Username)).ReturnsAsync(profile1);
+        _conversationStorageMock.Setup(m => m.EnumerateConversationsForAGivenUser(profile1.Username, null, null, null))
+            .ReturnsAsync((ListConversationsStorageResponse?)null);
+
+        await Assert.ThrowsAsync<ConversationNotFoundException>(() =>
+            _conversationService.EnumerateConversationsOfAGivenUser(profile1.Username));
     }
 }

@@ -46,7 +46,7 @@ public class ConversationController : ControllerBase
         try
         {
             var messagesStorageResponseDto = await _conversationService.EnumerateMessagesInAConversation(conversationId,
-                continuationToken, limit, lastSeenMessageTime);
+                HttpUtility.UrlDecode(continuationToken), limit, lastSeenMessageTime);
             var encodedContinuationToken = HttpUtility.UrlDecode(messagesStorageResponseDto.ContinuationToken);
             var nextUri =
                 $"/api/conversations/{conversationId}/messages?&limit={limit}&lastSeenMessageTime={lastSeenMessageTime}&continuationToken={encodedContinuationToken}";
@@ -92,7 +92,7 @@ public class ConversationController : ControllerBase
         } 
     }
 
-    [HttpGet]
+    [HttpGet("{userId}")]
     public async Task<ActionResult<ListConversationsResponse>> EnumerateConversationsOfAGivenUser(       
         [FromRoute] string userId,
         [FromQuery] string? continuationToken = null,
@@ -102,7 +102,7 @@ public class ConversationController : ControllerBase
         try
         {
             var conversationsStorageResponseDto =
-                await _conversationService.EnumerateConversationsOfAGivenUser(userId, continuationToken, limit,
+                await _conversationService.EnumerateConversationsOfAGivenUser(userId, HttpUtility.UrlDecode(continuationToken), limit,
                     lastSeenConversationTime);
             var nextUri =
                 $"/api/conversations?username={userId}&limit={limit}&lastSeenConversationTime={lastSeenConversationTime}&continuationToken={conversationsStorageResponseDto.ContinuationToken}";

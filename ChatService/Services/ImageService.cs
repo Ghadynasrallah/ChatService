@@ -4,7 +4,7 @@ using ChatService.Storage;
 
 namespace ChatService.Services;
 
-public class ImageService
+public class ImageService : IImageService
 {
     private readonly IProfilePictureStorage _profilePictureStorage;
 

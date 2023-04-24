@@ -6,7 +6,7 @@ public interface IConversationService
 {
     public Task<Message> SendMessageToConversation(string conversationId, SendMessageRequest sendMessageRequest);
 
-    public Task<ListMessagesStorageResponseDto> EnumerateMessagesInAConversation(
+    public Task<ListMessageServiceResponseDto> EnumerateMessagesInAConversation(
         string conversationId,
         string? continuationToken = null,
         int? limit = null,

@@ -4,7 +4,7 @@ using ChatService.Storage;
 
 namespace ChatService.Services;
 
-public class ProfileService
+public class ProfileService : IProfileService
 {
     private readonly IProfileStorage _profileStorage;
 

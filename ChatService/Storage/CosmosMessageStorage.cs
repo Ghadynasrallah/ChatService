@@ -25,7 +25,7 @@ public class CosmosMessageStorage : IMessageStorage
     {
         try
         {
-            List<ListMessageResponseItem> messagesResult = new List<ListMessageResponseItem>();
+            List<Message> messagesResult = new List<Message>();
             var queryOptions = new QueryRequestOptions
             {
                 PartitionKey = new PartitionKey(conversationId),
@@ -45,7 +45,7 @@ public class CosmosMessageStorage : IMessageStorage
                 response = await iterator.ReadNextAsync();
                 foreach (var messageEntity in response)
                 {
-                    messagesResult.Add(ToMessageResponse(messageEntity));
+                    messagesResult.Add(ToMessage(messageEntity));
                 }
             }
 
@@ -113,11 +113,7 @@ public class CosmosMessageStorage : IMessageStorage
         return new Message(messageEntity.id, messageEntity.text, messageEntity.senderUsername,
             messageEntity.partitionKey, messageEntity.unixTime);
     }
-
-    private static ListMessageResponseItem ToMessageResponse(MessageEntity messageEntity)
-    {
-        return new ListMessageResponseItem(messageEntity.text, messageEntity.senderUsername, messageEntity.unixTime);
-    }
+    
     private static MessageEntity ToMessageEntity(Message message)
     {
         return new MessageEntity(message.conversationId, message.messageId, message.text, message.senderUsername,

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using ChatService.Configuration;
 using ChatService.Storage;
 using Azure.Storage.Blobs;
+using ChatService.Services;
 using Microsoft.Azure.Storage;
 using Microsoft.Azure.Storage.Blob;
 
@@ -20,6 +21,9 @@ builder.Services.Configure<AzureBlobSettings>(builder.Configuration.GetSection("
 // Add Services
 builder.Services.AddSingleton<IProfileStorage, CosmosProfileStorage>();
 builder.Services.AddSingleton<IProfilePictureStorage, CloudBlobProfilePictureStorage>();
+builder.Services.AddSingleton<IProfileService, ProfileService>();
+builder.Services.AddSingleton<IImageService, ImageService>();
+builder.Services.AddSingleton<IConversationService, ConversationService>();
 builder.Services.AddSingleton<IConversationStorage, CosmosConversationStorage>();
 builder.Services.AddSingleton<IMessageStorage, CosmosMessageStorage>();
 

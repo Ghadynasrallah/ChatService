@@ -18,7 +18,7 @@ public class ImageControllerTest : IClassFixture<WebApplicationFactory<Program>>
 {
     private readonly Mock<IProfilePictureStorage> _profilePictureStorageMock = new();
     private readonly HttpClient _httpClient;
-    private readonly MemoryStream EmptyStream = new MemoryStream(new byte[0]);
+    private readonly MemoryStream _emptyStream = new MemoryStream(new byte[0]);
     //private readonly MemoryStream ImageStream = new MemoryStream(File.ReadAllBytes(@"/Users/ghady/RiderProjects/TestImage.jpg"));
     private readonly MemoryStream testStream = new MemoryStream(Encoding.UTF8.GetBytes("Hello world"));
 
