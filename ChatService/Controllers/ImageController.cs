@@ -1,9 +1,7 @@
 using ChatService.Dtos;
 using ChatService.Exceptions;
 using ChatService.Services;
-using ChatService.Storage;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Azure.Cosmos;
 
 
 namespace ChatService.Controllers;
@@ -30,11 +28,11 @@ public class ImageController : ControllerBase
         }
         catch (ArgumentException)
         {
-            return BadRequest("The Image file provided is empty");
+            return BadRequest("The Image file is empty");
         }
     }
 
-    [HttpGet("{id}")]
+    [HttpGet("{imageId}")]
     public async Task<ActionResult> DownloadImage([FromRoute] string imageId)
     {
         try

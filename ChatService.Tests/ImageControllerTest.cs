@@ -1,12 +1,10 @@
-using System.Drawing;
 using System.Net;
 using System.Text;
 using ChatService.Dtos;
-using ChatService.Storage;
-using Microsoft.AspNetCore.Mvc;
+using ChatService.Exceptions;
+using ChatService.Services;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
-using Microsoft.Azure.Cosmos.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Newtonsoft.Json;
@@ -16,24 +14,23 @@ namespace ChatService.Tests;
 
 public class ImageControllerTest : IClassFixture<WebApplicationFactory<Program>>
 {
-    private readonly Mock<IProfilePictureStorage> _profilePictureStorageMock = new();
+    private readonly Mock<IImageService> _imageServiceMock = new();
     private readonly HttpClient _httpClient;
-    private readonly MemoryStream _emptyStream = new MemoryStream(new byte[0]);
-    //private readonly MemoryStream ImageStream = new MemoryStream(File.ReadAllBytes(@"/Users/ghady/RiderProjects/TestImage.jpg"));
-    private readonly MemoryStream testStream = new MemoryStream(Encoding.UTF8.GetBytes("Hello world"));
+    private readonly MemoryStream _emptyStream = new MemoryStream(Encoding.UTF8.GetBytes(""));
+    private readonly MemoryStream _testStream = new MemoryStream(Encoding.UTF8.GetBytes("Hello world!"));
 
     public ImageControllerTest(WebApplicationFactory<Program> factory)
     {
         _httpClient = factory.WithWebHostBuilder(builder =>
         {
-            builder.ConfigureTestServices(services => { services.AddSingleton(_profilePictureStorageMock.Object); });
+            builder.ConfigureTestServices(services => { services.AddSingleton(_imageServiceMock.Object); });
         }).CreateClient();
     }
 
     [Fact]
     public async Task UploadValidImage()
     {
-        HttpContent fileStreamContent = new StreamContent(testStream);
+        HttpContent fileStreamContent = new StreamContent(_testStream);
         fileStreamContent.Headers.ContentDisposition = new ContentDispositionHeaderValue("form-data")
         {
             Name = "file",
@@ -43,7 +40,7 @@ public class ImageControllerTest : IClassFixture<WebApplicationFactory<Program>>
         formData.Add(fileStreamContent);
 
         var guid = Guid.NewGuid().ToString();
-        _profilePictureStorageMock.Setup(m => m.UploadImage(guid, It.IsAny<Stream>()));
+        _imageServiceMock.Setup(m => m.UploadImage(It.IsAny<Stream>())).ReturnsAsync(guid);
 
         var response = await _httpClient.PostAsync("Image", formData);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -52,29 +49,37 @@ public class ImageControllerTest : IClassFixture<WebApplicationFactory<Program>>
 
         Assert.Equal(guid, JsonConvert.DeserializeObject<UploadImageResponse>(json).ImageId);
 
-        _profilePictureStorageMock.Verify(m=> m.UploadImage(guid, It.IsAny<Stream>()), Times.Once);
+        _imageServiceMock.Verify(m=> m.UploadImage(It.IsAny<Stream>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task UploadImage_BadRequest()
+    {
+        HttpContent fileStreamContent = new StreamContent(_testStream);
+        fileStreamContent.Headers.ContentDisposition = new ContentDispositionHeaderValue("form-data")
+        {
+            Name = "file",
+            FileName = "Image"
+        };
+        using var formData = new MultipartFormDataContent();
+        formData.Add(fileStreamContent);
+
+        var guid = Guid.NewGuid().ToString();
+        _imageServiceMock.Setup(m => m.UploadImage(It.IsAny<Stream>())).ThrowsAsync(new ArgumentException());
+        
+        var response = await _httpClient.PostAsync("Image", formData);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
     public async Task DownloadValidImage()
     {
-        // Arrange
-        HttpContent fileStreamContent = new StreamContent(testStream); 
-        fileStreamContent.Headers.ContentDisposition = new ContentDispositionHeaderValue("form-data")
-        {
-            Name = "file",
-            FileName = "anything" // this is not important but must not be empty
-        };
-
-        using var formData = new MultipartFormDataContent();
-        formData.Add(fileStreamContent);
-
         var guid = Guid.NewGuid().ToString();
-        testStream.Position = 0;
-        _profilePictureStorageMock.Setup(m => m.DownloadImage(guid))
-            .ReturnsAsync(testStream);
+        _testStream.Position = 0;
+        _imageServiceMock.Setup(m => m.DownloadImage(guid))
+            .ReturnsAsync(_testStream);
 
-        var expectedData = testStream.ToArray();
+        var expectedData = _testStream.ToArray();
 
         // Act
         var response = await _httpClient.GetAsync($"Image/{guid}");
@@ -83,17 +88,25 @@ public class ImageControllerTest : IClassFixture<WebApplicationFactory<Program>>
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var responseContent = await response.Content.ReadAsByteArrayAsync();
         Assert.Equal(expectedData, responseContent);
-        _profilePictureStorageMock.Verify(m => m.DownloadImage(guid), Times.Once);
+        _imageServiceMock.Verify(m => m.DownloadImage(guid), Times.Once);
     }
     
     [Fact]
-    public async Task DownloadNonValidImage()
+    public async Task DownloadImage_NotFound()
     {
         var guid = Guid.NewGuid().ToString();
-        _profilePictureStorageMock.Setup(m => m.DownloadImage(guid))
-            .ReturnsAsync((Stream)null);
-        
+        _imageServiceMock.Setup(m => m.DownloadImage(guid)).ThrowsAsync(new ImageNotFoundException());
+
         var response = await _httpClient.GetAsync($"Image/{guid}");
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DownloadImage_BadRequest()
+    {
+        string id = "test";
+        _imageServiceMock.Setup(m => m.DownloadImage(id)).ThrowsAsync(new ArgumentException());
+        var response = await _httpClient.GetAsync($"Image/{id}");
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 }
