@@ -82,15 +82,15 @@ public class ConversationService : IConversationService
         return new ListMessageServiceResponseDto(messagesResult, response.ContinuationToken);
     }
 
-    public async Task<StartConversationResponse> StartConversation(StartConversationRequest startConversationRequestDto)
+    public async Task<StartConversationResponse> StartConversation(StartConversationRequest startConversationRequest)
     {
-        if (startConversationRequestDto.Participants.Length != 2)
+        if (startConversationRequest.Participants.Length != 2)
         {
             throw new ArgumentException("There must be 2 participants");
         }
-        var userId1 = startConversationRequestDto.Participants[0];
-        var userId2 = startConversationRequestDto.Participants[1];
-        var sendMessageRequest = startConversationRequestDto.FirstMessage;
+        var userId1 = startConversationRequest.Participants[0];
+        var userId2 = startConversationRequest.Participants[1];
+        var sendMessageRequest = startConversationRequest.FirstMessage;
         if (String.IsNullOrWhiteSpace(userId1) ||
             String.IsNullOrWhiteSpace(userId2))
         {
@@ -126,7 +126,7 @@ public class ConversationService : IConversationService
             conversation.LastModifiedUnixTime
         );
         await _messageStorage.PostMessageToConversation(message);
-        return new StartConversationResponse(conversationId, startConversationRequestDto.Participants, conversation.LastModifiedUnixTime);
+        return new StartConversationResponse(conversationId, startConversationRequest.Participants, conversation.LastModifiedUnixTime);
     }
 
     public async Task<ListConversationsServiceResponse> EnumerateConversationsOfAGivenUser(   

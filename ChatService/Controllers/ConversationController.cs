@@ -1,11 +1,8 @@
-using System.Net;
 using System.Web;
 using ChatService.Dtos;
 using ChatService.Exceptions;
 using ChatService.Services;
-using ChatService.Storage;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Azure.Cosmos;
 
 namespace ChatService.Controllers;
 
@@ -26,10 +23,10 @@ public class ConversationController : ControllerBase
         {
             var message = await _conversationService.SendMessageToConversation(conversationId, sendMessageRequest);
             return CreatedAtAction(nameof(EnumerateMessagesInAConversation),
-                                new {messageId = message.messageId, conversationId = message.conversationId },
+                                new {conversationId = message.conversationId },
                                      new SendMessageResponse(message.unixTime));
         }
-        catch (ArgumentException exception)
+        catch (ArgumentException)
         {
             return BadRequest($"Invalid message {sendMessageRequest}");
         }
@@ -47,9 +44,9 @@ public class ConversationController : ControllerBase
         {
             var messagesStorageResponseDto = await _conversationService.EnumerateMessagesInAConversation(conversationId,
                 HttpUtility.UrlDecode(continuationToken), limit, lastSeenMessageTime);
-            var encodedContinuationToken = HttpUtility.UrlDecode(messagesStorageResponseDto.ContinuationToken);
+            var encodedContinuationToken = HttpUtility.UrlEncode(messagesStorageResponseDto.ContinuationToken);
             var nextUri =
-                $"/api/conversations/{conversationId}/messages?&limit={limit}&lastSeenMessageTime={lastSeenMessageTime}&continuationToken={encodedContinuationToken}";
+                $"Conversation/{conversationId}/messages?lastSeenMessageTime={lastSeenMessageTime}&limit={limit}&continuationToken={encodedContinuationToken}";
             return Ok(new ListMessageResponse(messagesStorageResponseDto.Messages, nextUri));
         }
         catch (ArgumentException)
@@ -68,15 +65,15 @@ public class ConversationController : ControllerBase
 
     [HttpPost]
     public async Task<ActionResult<StartConversationResponse>> StartConversation(
-        [FromBody] StartConversationRequest startConversationRequestDto)
+        [FromBody] StartConversationRequest startConversationRequest)
     {
         try
         {
-            var startConversationResponseDto =
-                await _conversationService.StartConversation(startConversationRequestDto);
+            var startConversationResponse =
+                await _conversationService.StartConversation(startConversationRequest);
             return CreatedAtAction(nameof(EnumerateConversationsOfAGivenUser),
-                new { conversationId = startConversationResponseDto.Id },
-                startConversationResponseDto);
+                new { userId = startConversationResponse.Participants[0] },
+                startConversationResponse);
         }
         catch (ArgumentException exception)
         {
@@ -92,9 +89,9 @@ public class ConversationController : ControllerBase
         } 
     }
 
-    [HttpGet("{userId}")]
+    [HttpGet]
     public async Task<ActionResult<ListConversationsResponse>> EnumerateConversationsOfAGivenUser(       
-        [FromRoute] string userId,
+        [FromQuery] string username,
         [FromQuery] string? continuationToken = null,
         [FromQuery] int? limit = null,
         [FromQuery] long? lastSeenConversationTime = null)
@@ -102,10 +99,10 @@ public class ConversationController : ControllerBase
         try
         {
             var conversationsStorageResponseDto =
-                await _conversationService.EnumerateConversationsOfAGivenUser(userId, HttpUtility.UrlDecode(continuationToken), limit,
-                    lastSeenConversationTime);
+                await _conversationService.EnumerateConversationsOfAGivenUser(username, HttpUtility.UrlDecode(continuationToken), limit, lastSeenConversationTime);
+            var encodedResponseToken = HttpUtility.UrlEncode(conversationsStorageResponseDto.ContinuationToken);
             var nextUri =
-                $"/api/conversations?username={userId}&limit={limit}&lastSeenConversationTime={lastSeenConversationTime}&continuationToken={conversationsStorageResponseDto.ContinuationToken}";
+                $"Conversation?username={username}&limit={limit}&lastSeenConversationTime={lastSeenConversationTime}&continuationToken={encodedResponseToken}";
             return Ok(new ListConversationsResponse(conversationsStorageResponseDto.Conversations,
                 nextUri));
         }
@@ -119,7 +116,7 @@ public class ConversationController : ControllerBase
         }
         catch (UserNotFoundException)
         {
-            return NotFound($"The user with username {userId} was not found");
+            return NotFound($"The user with username {username} was not found");
         }
     }
 }

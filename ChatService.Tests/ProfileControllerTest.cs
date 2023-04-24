@@ -3,6 +3,8 @@ using System.Text;
 using ChatService.Storage;
 using ChatService.Dtos;
 using ChatService.Controllers;
+using ChatService.Exceptions;
+using ChatService.Services;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,39 +15,38 @@ namespace ChatService.Tests;
 
 public class UserControllerTest : IClassFixture<WebApplicationFactory<Program>>
 {
-    private readonly Mock<IProfileStorage> _profileStorageMock = new();
+    private readonly Mock<IProfileService> _profileServiceMock = new();
     private readonly HttpClient _httpClient;
+    private readonly Profile _profile = new Profile("foobar", "Foo", "Bar", Guid.NewGuid().ToString());
 
     public UserControllerTest(WebApplicationFactory<Program> factory)
     {
         _httpClient = factory.WithWebHostBuilder(builder =>
         {
-            builder.ConfigureTestServices(services => { services.AddSingleton(_profileStorageMock.Object); });
+            builder.ConfigureTestServices(services => { services.AddSingleton(_profileServiceMock.Object); });
         }).CreateClient();
     }
 
     [Fact]
     public async Task GetProfile()
     {
-        var profile = new Profile("foobar", "Foo", "Bar", Guid.NewGuid().ToString());
-        _profileStorageMock.Setup(m => m.GetProfile(profile.Username))
-            .ReturnsAsync(profile);
+        _profileServiceMock.Setup(m => m.GetProfile(_profile.Username))
+            .ReturnsAsync(_profile);
         
-        var response = await _httpClient.GetAsync($"Profile/{profile.Username}");
+        var response = await _httpClient.GetAsync($"Profile/{_profile.Username}");
         
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var json = await response.Content.ReadAsStringAsync();
-        Assert.Equal(profile, JsonConvert.DeserializeObject<Profile>(json));
+        Assert.Equal(_profile, JsonConvert.DeserializeObject<Profile>(json));
 
-        _profileStorageMock.Verify(m => m.GetProfile(profile.Username), Times.Once);
+        _profileServiceMock.Verify(m => m.GetProfile(_profile.Username), Times.Once);
 
     }
 
     [Fact]
     public async Task GetProfile_NotFound()
     {
-        _profileStorageMock.Setup(m => m.GetProfile("foobar"))
-            .ReturnsAsync((Profile?)null);
+        _profileServiceMock.Setup(m => m.GetProfile("foobar")).ThrowsAsync(new UserNotFoundException());
 
         var response = await _httpClient.GetAsync($"User/Profile/foobar");
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -54,99 +55,94 @@ public class UserControllerTest : IClassFixture<WebApplicationFactory<Program>>
     [Fact]
     public async Task AddProfile()
     {
-        var profile = new Profile("foobar", "Foo", "Bar", Guid.NewGuid().ToString());
         var response = await _httpClient.PostAsync($"Profile",
-            new StringContent(JsonConvert.SerializeObject(profile), Encoding.Default, "application/json"));
+            new StringContent(JsonConvert.SerializeObject(_profile), Encoding.Default, "application/json"));
         
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         Assert.Equal("http://localhost/Profile/foobar", response.Headers.GetValues("Location").First());
         
-        _profileStorageMock.Verify(mock => mock.UpsertProfile(profile), Times.Once);
+        _profileServiceMock.Verify(mock => mock.AddProfile(_profile), Times.Once);
     }
 
     [Fact]
     public async Task AddProfile_Conflict()
     {
-        var profile = new Profile("foobar", "Foo", "Bar", Guid.NewGuid().ToString());
-        _profileStorageMock.Setup(m => m.GetProfile(profile.Username))
-            .ReturnsAsync(profile);
+        _profileServiceMock.Setup(m => m.AddProfile(_profile))
+            .ThrowsAsync(new UserConflictException());
 
         var response = await _httpClient.PostAsync("/Profile",
-            new StringContent(JsonConvert.SerializeObject(profile), Encoding.Default, "application/json"));
+            new StringContent(JsonConvert.SerializeObject(_profile), Encoding.Default, "application/json"));
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         
-        _profileStorageMock.Verify(m => m.UpsertProfile(profile), Times.Never);
+        _profileServiceMock.Verify(m => m.AddProfile(_profile), Times.Once);
     }
 
-    [Theory]
-    [InlineData(null, "Foo", "Bar")]
-    [InlineData("", "Foo", "Bar")]
-    [InlineData(" ", "Foo", "Bar")]
-    [InlineData("foobar", null, "Bar")]
-    [InlineData("foobar", "", "Bar")]
-    [InlineData("foobar", "   ", "Bar")]
-    [InlineData("foobar", "Foo", "")]
-    [InlineData("foobar", "Foo", null)]
-    [InlineData("foobar", "Foo", " ")]
-    //Note that we did not add tests for ProfilePictureId as it can be null, empty, or whitespace
-    public async Task AddProfile_InvalidArgs(string username, string firstName, string lastName)
+    [Fact]
+    public async Task AddProfile_InvalidArgs()
     {
-        var profile = new Profile(username, firstName, lastName, Guid.NewGuid().ToString());
+        _profileServiceMock.Setup(m => m.AddProfile(_profile))
+            .ThrowsAsync(new ArgumentException());
         var response = await _httpClient.PostAsync("/Profile",
-            new StringContent(JsonConvert.SerializeObject(profile), Encoding.Default, "application/json"));
+            new StringContent(JsonConvert.SerializeObject(_profile), Encoding.Default, "application/json"));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        _profileStorageMock.Verify(mock => mock.UpsertProfile(profile), Times.Never);
+        _profileServiceMock.Verify(mock => mock.AddProfile(_profile), Times.Once);
     }
 
     [Fact]
     public async Task UpdateProfile()
     {
-        var profile = new Profile("foobar", "Foo", "Bar", Guid.NewGuid().ToString());
-        _profileStorageMock.Setup(m => m.GetProfile(profile.Username))
-            .ReturnsAsync(profile);
+        //Setup
+        var putProfileRequest = new PutProfileRequest("mike", "bar", "testId");
+        var updatedProfile = new Profile(_profile.Username, putProfileRequest.FirstName, putProfileRequest.LastName,
+            putProfileRequest.ProfilePictureId);
 
-        var updatedProfile = profile with { FirstName = "Foo2", LastName = "Bar2", ProfilePictureId = Guid.NewGuid().ToString()};
+        _profileServiceMock.Setup(m => m.UpdateProfile(_profile.Username, putProfileRequest))
+            .ReturnsAsync(updatedProfile);
+        
+        //Act
+        var response = await _httpClient.PutAsync($"Profile/{_profile.Username}",
+            new StringContent(JsonConvert.SerializeObject(putProfileRequest), Encoding.Default, "application/json"));
+        var json = await response.Content.ReadAsStringAsync();
+        var actualProfileResponse = JsonConvert.DeserializeObject<Profile>(json);
 
-        var response = await _httpClient.PutAsync($"/Profile/{profile.Username}",
-            new StringContent(JsonConvert.SerializeObject(updatedProfile), Encoding.Default, "application/json"));
+        //Assert and Verify
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        _profileStorageMock.Verify(mock => mock.UpsertProfile(updatedProfile));
+        Assert.Equal(updatedProfile, actualProfileResponse);
+        _profileServiceMock.Verify(m=>m.UpdateProfile(_profile.Username, putProfileRequest), Times.Once);
     }
-    
+
     [Fact]
     public async Task UpdateProfile_NotFound()
     {
-        var profile = new Profile("foobar", "Foo", "Bar", Guid.NewGuid().ToString());
-        _profileStorageMock.Setup(m => m.GetProfile(profile.Username))
-            .ReturnsAsync((Profile?)null);
-        var putProfileRequest = new PutProfileRequest(profile.FirstName, profile.LastName, profile.ProfilePictureId);
-
-        var response = await _httpClient.PutAsync($"User/{profile.Username}",
-            new StringContent(JsonConvert.SerializeObject(putProfileRequest), Encoding.Default, "application/json"));
+        //Setup
+        var putProfileRequest = new PutProfileRequest("mike", "bar", "testId");
+        _profileServiceMock.Setup(m => m.UpdateProfile(_profile.Username, It.IsAny<PutProfileRequest>()))
+            .ThrowsAsync(new UserNotFoundException());
         
+        //Act
+        var response = await _httpClient.PutAsync($"Profile/{_profile.Username}",
+            new StringContent(JsonConvert.SerializeObject(putProfileRequest), Encoding.Default, "application/json"));
+
+        //Assert and Verify
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        _profileStorageMock.Verify(mock => mock.UpsertProfile(It.IsAny<Profile>()), Times.Never);
+        _profileServiceMock.Verify(m=>m.UpdateProfile(_profile.Username, putProfileRequest), Times.Once);
     }
 
-    [Theory]
-    [InlineData("foobar", null, "Bar")]
-    [InlineData("foobar", "", "Bar")]
-    [InlineData("foobar", "   ", "Bar")]
-    [InlineData("foobar", "Foo", "")]
-    [InlineData("foobar", "Foo", null)]
-    [InlineData("foobar", "Foo", " ")]
-    public async Task UpdateProfile_InvalidArgs(string username, string firstName, string lastName)
+    [Fact]
+    public async Task UpdateProfile_InvalidArgs()
     {
-        var putProfileRequest = new PutProfileRequest(firstName, lastName, Guid.NewGuid().ToString());
-        var profile = new Profile("foobar", "Foo", "Bar", Guid.NewGuid().ToString());
-
-        _profileStorageMock.Setup(m => m.GetProfile(profile.Username))
-            .ReturnsAsync(profile);
+        //Setup
+        var putProfileRequest = new PutProfileRequest("mike", "bar", "testId");
+        _profileServiceMock.Setup(m => m.UpdateProfile(_profile.Username, It.IsAny<PutProfileRequest>()))
+            .ThrowsAsync(new ArgumentException());
         
-        var response = await _httpClient.PostAsync($"/Profile/{username}",
+        //Act
+        var response = await _httpClient.PutAsync($"Profile/{_profile.Username}",
             new StringContent(JsonConvert.SerializeObject(putProfileRequest), Encoding.Default, "application/json"));
-        
-        Assert.Equal(HttpStatusCode.MethodNotAllowed, response.StatusCode);
+
+        //Assert and Verify
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        _profileServiceMock.Verify(m=>m.UpdateProfile(_profile.Username, putProfileRequest), Times.Once);
     }
 }

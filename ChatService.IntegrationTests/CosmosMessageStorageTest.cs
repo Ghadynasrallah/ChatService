@@ -71,13 +71,12 @@ public class CosmosMessageStorageTest : IClassFixture<WebApplicationFactory<Prog
         await _store.PostMessageToConversation(_message1);
         await _store.PostMessageToConversation(_message2);
 
-        List<ListMessageResponseItem> expectedMessages = new List<ListMessageResponseItem>()
+        List<Message> expectedMessages = new List<Message>()
         {
-            new ListMessageResponseItem(_message1.text, _message1.senderUsername, _message1.unixTime),
-            new ListMessageResponseItem(_message2.text, _message2.senderUsername, _message2.unixTime)
+            _message1, _message2
         };
 
         var realMessages = await _store.EnumerateMessagesFromAGivenConversation("foo_mike");
-        CollectionAssert.AreEquivalent(expectedMessages, realMessages.Messages);
+        CollectionAssert.AreEquivalent(expectedMessages, realMessages?.Messages);
     }
 }
