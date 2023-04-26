@@ -16,7 +16,6 @@ public class ImageControllerTest : IClassFixture<WebApplicationFactory<Program>>
 {
     private readonly Mock<IImageService> _imageServiceMock = new();
     private readonly HttpClient _httpClient;
-    private readonly MemoryStream _emptyStream = new MemoryStream(Encoding.UTF8.GetBytes(""));
     private readonly MemoryStream _testStream = new MemoryStream(Encoding.UTF8.GetBytes("Hello world!"));
 
     public ImageControllerTest(WebApplicationFactory<Program> factory)
@@ -42,7 +41,7 @@ public class ImageControllerTest : IClassFixture<WebApplicationFactory<Program>>
         var guid = Guid.NewGuid().ToString();
         _imageServiceMock.Setup(m => m.UploadImage(It.IsAny<Stream>())).ReturnsAsync(guid);
 
-        var response = await _httpClient.PostAsync("Image", formData);
+        var response = await _httpClient.PostAsync("api/images", formData);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var json = await response.Content.ReadAsStringAsync();
@@ -67,7 +66,7 @@ public class ImageControllerTest : IClassFixture<WebApplicationFactory<Program>>
         var guid = Guid.NewGuid().ToString();
         _imageServiceMock.Setup(m => m.UploadImage(It.IsAny<Stream>())).ThrowsAsync(new ArgumentException());
         
-        var response = await _httpClient.PostAsync("Image", formData);
+        var response = await _httpClient.PostAsync("api/images", formData);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
@@ -82,7 +81,7 @@ public class ImageControllerTest : IClassFixture<WebApplicationFactory<Program>>
         var expectedData = _testStream.ToArray();
 
         // Act
-        var response = await _httpClient.GetAsync($"Image/{guid}");
+        var response = await _httpClient.GetAsync($"api/images/{guid}");
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -97,7 +96,7 @@ public class ImageControllerTest : IClassFixture<WebApplicationFactory<Program>>
         var guid = Guid.NewGuid().ToString();
         _imageServiceMock.Setup(m => m.DownloadImage(guid)).ThrowsAsync(new ImageNotFoundException());
 
-        var response = await _httpClient.GetAsync($"Image/{guid}");
+        var response = await _httpClient.GetAsync($"api/images/{guid}");
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
@@ -106,7 +105,7 @@ public class ImageControllerTest : IClassFixture<WebApplicationFactory<Program>>
     {
         string id = "test";
         _imageServiceMock.Setup(m => m.DownloadImage(id)).ThrowsAsync(new ArgumentException());
-        var response = await _httpClient.GetAsync($"Image/{id}");
+        var response = await _httpClient.GetAsync($"api/images/{id}");
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 }

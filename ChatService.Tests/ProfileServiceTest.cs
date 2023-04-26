@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using ChatService.Dtos;
 using ChatService.Exceptions;
 using ChatService.Services;

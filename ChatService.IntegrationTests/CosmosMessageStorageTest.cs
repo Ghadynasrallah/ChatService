@@ -1,6 +1,5 @@
 using ChatService.Dtos;
 using ChatService.Storage;
-using ChatService.Storage.Entities;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using NUnit.Framework;
@@ -27,15 +26,15 @@ public class CosmosMessageStorageTest : IClassFixture<WebApplicationFactory<Prog
 
     public async Task DisposeAsync()
     {
-        await _store.DeleteMessage(_message1.conversationId, _message1.messageId);
-        await _store.DeleteMessage(_message2.conversationId, _message2.messageId);
+        await _store.DeleteMessage(_message1.ConversationId, _message1.MessageId);
+        await _store.DeleteMessage(_message2.ConversationId, _message2.MessageId);
     }
 
     [Fact]
     public async Task PostValidMessage()
     {
         await _store.PostMessageToConversation(_message1);
-        Assert.Equal(_message1, await _store.GetMessage(_message1.conversationId, _message1.messageId));
+        Assert.Equal(_message1, await _store.GetMessage(_message1.ConversationId, _message1.MessageId));
     }
     
     [Fact]
@@ -55,8 +54,8 @@ public class CosmosMessageStorageTest : IClassFixture<WebApplicationFactory<Prog
     public async Task DeleteExistingMessage()
     {
         await _store.PostMessageToConversation(_message1);
-        Assert.True(await _store.DeleteMessage(_message1.conversationId, _message1.messageId));
-        Assert.Null(await _store.GetMessage(_message1.conversationId, _message1.messageId));
+        Assert.True(await _store.DeleteMessage(_message1.ConversationId, _message1.MessageId));
+        Assert.Null(await _store.GetMessage(_message1.ConversationId, _message1.MessageId));
     }
 
     [Fact]

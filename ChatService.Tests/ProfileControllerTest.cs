@@ -1,8 +1,6 @@
 using System.Net;
 using System.Text;
-using ChatService.Storage;
 using ChatService.Dtos;
-using ChatService.Controllers;
 using ChatService.Exceptions;
 using ChatService.Services;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -33,7 +31,7 @@ public class UserControllerTest : IClassFixture<WebApplicationFactory<Program>>
         _profileServiceMock.Setup(m => m.GetProfile(_profile.Username))
             .ReturnsAsync(_profile);
         
-        var response = await _httpClient.GetAsync($"Profile/{_profile.Username}");
+        var response = await _httpClient.GetAsync($"api/profile/{_profile.Username}");
         
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var json = await response.Content.ReadAsStringAsync();
@@ -48,18 +46,18 @@ public class UserControllerTest : IClassFixture<WebApplicationFactory<Program>>
     {
         _profileServiceMock.Setup(m => m.GetProfile("foobar")).ThrowsAsync(new UserNotFoundException());
 
-        var response = await _httpClient.GetAsync($"User/Profile/foobar");
+        var response = await _httpClient.GetAsync($"api/profile/foobar");
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]
     public async Task AddProfile()
     {
-        var response = await _httpClient.PostAsync($"Profile",
+        var response = await _httpClient.PostAsync($"api/profile",
             new StringContent(JsonConvert.SerializeObject(_profile), Encoding.Default, "application/json"));
         
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        Assert.Equal("http://localhost/Profile/foobar", response.Headers.GetValues("Location").First());
+        Assert.Equal("http://localhost/api/profile/foobar", response.Headers.GetValues("Location").First());
         
         _profileServiceMock.Verify(mock => mock.AddProfile(_profile), Times.Once);
     }
@@ -70,7 +68,7 @@ public class UserControllerTest : IClassFixture<WebApplicationFactory<Program>>
         _profileServiceMock.Setup(m => m.AddProfile(_profile))
             .ThrowsAsync(new UserConflictException());
 
-        var response = await _httpClient.PostAsync("/Profile",
+        var response = await _httpClient.PostAsync("api/profile",
             new StringContent(JsonConvert.SerializeObject(_profile), Encoding.Default, "application/json"));
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         
@@ -82,7 +80,7 @@ public class UserControllerTest : IClassFixture<WebApplicationFactory<Program>>
     {
         _profileServiceMock.Setup(m => m.AddProfile(_profile))
             .ThrowsAsync(new ArgumentException());
-        var response = await _httpClient.PostAsync("/Profile",
+        var response = await _httpClient.PostAsync("api/profile",
             new StringContent(JsonConvert.SerializeObject(_profile), Encoding.Default, "application/json"));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -101,7 +99,7 @@ public class UserControllerTest : IClassFixture<WebApplicationFactory<Program>>
             .ReturnsAsync(updatedProfile);
         
         //Act
-        var response = await _httpClient.PutAsync($"Profile/{_profile.Username}",
+        var response = await _httpClient.PutAsync($"api/profile/{_profile.Username}",
             new StringContent(JsonConvert.SerializeObject(putProfileRequest), Encoding.Default, "application/json"));
         var json = await response.Content.ReadAsStringAsync();
         var actualProfileResponse = JsonConvert.DeserializeObject<Profile>(json);
@@ -121,7 +119,7 @@ public class UserControllerTest : IClassFixture<WebApplicationFactory<Program>>
             .ThrowsAsync(new UserNotFoundException());
         
         //Act
-        var response = await _httpClient.PutAsync($"Profile/{_profile.Username}",
+        var response = await _httpClient.PutAsync($"api/profile/{_profile.Username}",
             new StringContent(JsonConvert.SerializeObject(putProfileRequest), Encoding.Default, "application/json"));
 
         //Assert and Verify
@@ -138,7 +136,7 @@ public class UserControllerTest : IClassFixture<WebApplicationFactory<Program>>
             .ThrowsAsync(new ArgumentException());
         
         //Act
-        var response = await _httpClient.PutAsync($"Profile/{_profile.Username}",
+        var response = await _httpClient.PutAsync($"api/profile/{_profile.Username}",
             new StringContent(JsonConvert.SerializeObject(putProfileRequest), Encoding.Default, "application/json"));
 
         //Assert and Verify

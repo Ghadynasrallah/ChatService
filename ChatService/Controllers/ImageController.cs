@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace ChatService.Controllers;
 
 [ApiController]
-[Route("[Controller]")]
+[Route("api/images")]
 public class ImageController : ControllerBase
 {
     private readonly IImageService _imageService;

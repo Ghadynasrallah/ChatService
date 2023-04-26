@@ -1,6 +1,5 @@
 using System.Net;
 using ChatService.Dtos;
-using ChatService.Exceptions;
 using ChatService.Storage.Entities;
 using Microsoft.Azure.Cosmos;
 
@@ -32,15 +31,16 @@ public class CosmosConversationStorage : IConversationStorage
                 ConsistencyLevel = ConsistencyLevel.Session,
                 MaxItemCount = limit ?? -1
             };
-            
-            var queryText = "SELECT * FROM c ORDER BY c.lastModifiedUnixTime ASC";
+
+            var queryText = "SELECT * FROM c ORDER BY c.lastModifiedUnixTime DESC";
             if (lastSeenConversationTime != null)
-            { 
-                queryText = $"SELECT * FROM c WHERE c.lastModifiedUnixTime > {lastSeenConversationTime.ToString()} ORDER BY c.lastModifiedUnixTime ASC";
+            {
+                queryText = $"SELECT * FROM c WHERE c.lastModifiedUnixTime > {lastSeenConversationTime.ToString()} ORDER BY c.lastModifiedUnixTime DESC";
             }
             var iterator = container.GetItemQueryIterator<ConversationEntity>(requestOptions: queryOptions, queryText: queryText, continuationToken: continuationToken);
             FeedResponse<ConversationEntity>? response = null;
-            while (iterator.HasMoreResults)
+
+            if (iterator.HasMoreResults)
             {
                 response = await iterator.ReadNextAsync();
                 foreach (var conversationEntity in response)
@@ -59,7 +59,7 @@ public class CosmosConversationStorage : IConversationStorage
             throw;
         }
     }
-
+    
     public async Task<string> UpsertConversation(PostConversationRequest conversation)
     {
         await container.UpsertItemAsync(ToConversationEntity(conversation, conversation.UserId1));

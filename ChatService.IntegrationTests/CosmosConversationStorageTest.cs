@@ -18,8 +18,9 @@ public class CosmosConversationStorageTest :  IClassFixture<WebApplicationFactor
     private readonly Conversation _conversation2 = new Conversation("john_mike","mike", "john", 100200);
     private readonly PostConversationRequest _postConversation3 = new PostConversationRequest("ripper", "mike", 100010);
     private readonly Conversation _conversation3 = new Conversation("mike_ripper","ripper", "mike", 100010);
+    private readonly PostConversationRequest _postConversation4 = new PostConversationRequest("john", "foo", 100300);
+    private readonly Conversation _conversation4 = new Conversation("foo_john", "john", "foo", 100300);
     
-
     public CosmosConversationStorageTest(WebApplicationFactory<Program> factory)
     {
         _store = factory.Services.GetRequiredService<IConversationStorage>();
@@ -78,11 +79,13 @@ public class CosmosConversationStorageTest :  IClassFixture<WebApplicationFactor
         await _store.UpsertConversation(_postConversation1);
         await _store.UpsertConversation(_postConversation2);
         await _store.UpsertConversation(_postConversation3);
+        await _store.UpsertConversation(_postConversation4);
 
         List<Conversation> expectedConversationsForJohn = new List<Conversation>()
         {
             _conversation1,
-            _conversation2
+            _conversation2, 
+            _conversation4
         };
         
         List<Conversation> expectedConversationsForMike = new List<Conversation>()
@@ -104,5 +107,41 @@ public class CosmosConversationStorageTest :  IClassFixture<WebApplicationFactor
         CollectionAssert.AreEquivalent(expectedConversationsForJohn, realConversationsForJohn.Conversations); 
         CollectionAssert.AreEquivalent(expectedConversationsForMike, realConversationsForMike.Conversations); 
         CollectionAssert.AreEquivalent(expectedConversationsForRipper, realConversationsForRipper.Conversations); 
+    }
+    
+    [Fact]
+    public async Task EnumerateConversations_WithLimitAndContinuationToken()
+    {
+        await _store.UpsertConversation(_postConversation4);
+        await _store.UpsertConversation(_postConversation1);
+        await _store.UpsertConversation(_postConversation2);
+
+        List<Conversation> expectedConversationsForJohn = new List<Conversation>()
+        {
+            _conversation4,
+            _conversation2
+        };
+
+        var realConversationsForJohn = await _store.EnumerateConversationsForAGivenUser("john", null, 2, null);
+        Assert.Equal(expectedConversationsForJohn, realConversationsForJohn?.Conversations);
+        
+        var secondResponse = await _store.EnumerateConversationsForAGivenUser("john", realConversationsForJohn.ContinuationToken, null, null);
+        Assert.Equal(new List<Conversation>{_conversation1}, secondResponse.Conversations);
+    }
+    
+    [Fact]
+    public async Task EnumerateConversations_WithLastSeenTime()
+    {
+        await _store.UpsertConversation(_postConversation1);
+        await _store.UpsertConversation(_postConversation2);
+        await _store.UpsertConversation(_postConversation4);
+
+        List<Conversation> expectedConversationsForJohn = new List<Conversation>()
+        {
+            _conversation4
+        };
+
+        var realConversationsForJohn = await _store.EnumerateConversationsForAGivenUser("john", null, null, 100201);
+        Assert.Equal(expectedConversationsForJohn, realConversationsForJohn?.Conversations);
     }
 }

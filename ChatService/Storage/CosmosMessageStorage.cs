@@ -33,14 +33,14 @@ public class CosmosMessageStorage : IMessageStorage
                 MaxItemCount = limit ?? -1
             };
             
-            var queryText = "SELECT * FROM c ORDER BY c.unixTime ASC";
+            var queryText = "SELECT * FROM c ORDER BY c.unixTime DESC";
             if (lastSeenMessageTime != null)
             { 
-                queryText = $"SELECT * FROM c WHERE c.unixTime > {lastSeenMessageTime.ToString()} ORDER BY c.unixTime ASC";
+                queryText = $"SELECT * FROM c WHERE c.unixTime > {lastSeenMessageTime.ToString()} ORDER BY c.unixTime DESC";
             }
             var iterator = container.GetItemQueryIterator<MessageEntity>(requestOptions: queryOptions, queryText: queryText, continuationToken: continuationToken);
             FeedResponse<MessageEntity>? response = null;
-            while (iterator.HasMoreResults)
+            if (iterator.HasMoreResults)
             {
                 response = await iterator.ReadNextAsync();
                 foreach (var messageEntity in response)
@@ -48,10 +48,7 @@ public class CosmosMessageStorage : IMessageStorage
                     messagesResult.Add(ToMessage(messageEntity));
                 }
             }
-
-            if (response != null)
-                return new ListMessagesStorageResponseDto(messagesResult, response.ContinuationToken);
-            return new ListMessagesStorageResponseDto(messagesResult, null);
+            return new ListMessagesStorageResponseDto(messagesResult, response?.ContinuationToken);
         }
         catch (CosmosException e)
         {
@@ -116,7 +113,7 @@ public class CosmosMessageStorage : IMessageStorage
     
     private static MessageEntity ToMessageEntity(Message message)
     {
-        return new MessageEntity(message.conversationId, message.messageId, message.text, message.senderUsername,
-            message.unixTime);
+        return new MessageEntity(message.ConversationId, message.MessageId, message.Text, message.SenderUsername,
+            message.UnixTime);
     }
 }

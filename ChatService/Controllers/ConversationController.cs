@@ -1,3 +1,5 @@
+using System.Net;
+using System.Text;
 using System.Web;
 using ChatService.Dtos;
 using ChatService.Exceptions;
@@ -7,7 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace ChatService.Controllers;
 
 [ApiController]
-[Route("[Controller]")]
+[Route("api/conversations")]
 public class ConversationController : ControllerBase
 {
     private readonly IConversationService _conversationService;
@@ -23,15 +25,28 @@ public class ConversationController : ControllerBase
         {
             var message = await _conversationService.SendMessageToConversation(conversationId, sendMessageRequest);
             return CreatedAtAction(nameof(EnumerateMessagesInAConversation),
-                                new {conversationId = message.conversationId },
-                                     new SendMessageResponse(message.unixTime));
+                new { conversationId = message.ConversationId },
+                new SendMessageResponse(message.UnixTime));
         }
         catch (ArgumentException)
         {
             return BadRequest($"Invalid message {sendMessageRequest}");
         }
+        catch (MessageConflictException)
+        {
+            return Conflict(
+                $"There already exists a message with id {sendMessageRequest.Id} in conversation {conversationId}");
+        }
+        catch (ConversationNotFoundException)
+        {
+            return NotFound($"There exists no conversation with ID {conversationId}");
+        }
+        catch (SenderNotParticipantException)
+        {
+            return BadRequest(
+                $"The sender with username {sendMessageRequest.SenderUsername} is not a participant of the conversation with ID {conversationId}");
+        }
     }
-    
 
     [HttpGet("{conversationId}/messages")]
     public async Task<ActionResult<ListMessageResponse>> EnumerateMessagesInAConversation(
@@ -42,11 +57,21 @@ public class ConversationController : ControllerBase
     {
         try
         {
+            string? decodedContinuationToken = null;
+            if (continuationToken != null)
+            {
+                decodedContinuationToken = Encoding.UTF8.GetString(Convert.FromBase64String(continuationToken));
+            }
             var messagesStorageResponseDto = await _conversationService.EnumerateMessagesInAConversation(conversationId,
-                HttpUtility.UrlDecode(continuationToken), limit, lastSeenMessageTime);
-            var encodedContinuationToken = HttpUtility.UrlEncode(messagesStorageResponseDto.ContinuationToken);
-            var nextUri =
-                $"Conversation/{conversationId}/messages?lastSeenMessageTime={lastSeenMessageTime}&limit={limit}&continuationToken={encodedContinuationToken}";
+                decodedContinuationToken, limit, lastSeenMessageTime);
+            string? nextUri = null;
+            if (messagesStorageResponseDto.ContinuationToken != null)
+            {
+                var encodedContinuationToken =
+                    Convert.ToBase64String(Encoding.UTF8.GetBytes(messagesStorageResponseDto.ContinuationToken));
+                nextUri =
+                    $"api/conversations/{conversationId}/messages?lastSeenMessageTime={lastSeenMessageTime}&limit={limit}&continuationToken={encodedContinuationToken}";
+            }
             return Ok(new ListMessageResponse(messagesStorageResponseDto.Messages, nextUri));
         }
         catch (ArgumentException)
@@ -59,13 +84,13 @@ public class ConversationController : ControllerBase
         }
         catch (MessageNotFoundException)
         {
-            return Ok(new ListMessageResponse(new List<ListMessageResponseItem>(), null));
+            return Ok(new ListMessageResponse(new List<ListMessageResponseItem>()));
         }
     }
 
     [HttpPost]
-    public async Task<ActionResult<StartConversationResponse>> StartConversation(
-        [FromBody] StartConversationRequest startConversationRequest)
+    public async Task<ActionResult<AddConversationResponse>> StartConversation(
+        [FromBody] AddConversationRequest startConversationRequest)
     {
         try
         {
@@ -86,7 +111,11 @@ public class ConversationController : ControllerBase
         catch (ConversationConflictException exception)
         {
             return Conflict(exception.Message);
-        } 
+        }
+        catch (SenderNotParticipantException)
+        {
+            return BadRequest($"The sender with username {startConversationRequest.FirstMessage.SenderUsername} is not a participant");
+        }
     }
 
     [HttpGet]
@@ -98,11 +127,21 @@ public class ConversationController : ControllerBase
     {
         try
         {
+            string? decodedContinuationToken = null;
+            if (continuationToken != null)
+            {
+                decodedContinuationToken = Encoding.UTF8.GetString(Convert.FromBase64String(continuationToken));
+            }
             var conversationsStorageResponseDto =
-                await _conversationService.EnumerateConversationsOfAGivenUser(username, HttpUtility.UrlDecode(continuationToken), limit, lastSeenConversationTime);
-            var encodedResponseToken = HttpUtility.UrlEncode(conversationsStorageResponseDto.ContinuationToken);
-            var nextUri =
-                $"Conversation?username={username}&limit={limit}&lastSeenConversationTime={lastSeenConversationTime}&continuationToken={encodedResponseToken}";
+                await _conversationService.EnumerateConversationsOfAGivenUser(username, decodedContinuationToken, limit, lastSeenConversationTime);
+            string? nextUri = null;
+            if (conversationsStorageResponseDto.ContinuationToken != null)
+            {
+                var encodedContinuationToken =
+                    Convert.ToBase64String(Encoding.UTF8.GetBytes(conversationsStorageResponseDto.ContinuationToken));
+                nextUri =
+                    $"api/conversations?username={username}&limit={limit}&lastSeenConversationTime={lastSeenConversationTime}&continuationToken={encodedContinuationToken}";
+            }
             return Ok(new ListConversationsResponse(conversationsStorageResponseDto.Conversations,
                 nextUri));
         }

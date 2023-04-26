@@ -26,7 +26,7 @@ public class ConversationService : IConversationService
         }
         if (String.IsNullOrWhiteSpace(sendMessageRequest.Text) ||
             String.IsNullOrWhiteSpace(sendMessageRequest.SenderUsername) ||
-            String.IsNullOrWhiteSpace(sendMessageRequest.MessageId))
+            String.IsNullOrWhiteSpace(sendMessageRequest.Id))
         {
             throw new ArgumentException($"Invalid message {sendMessageRequest}", nameof(sendMessageRequest));
         }
@@ -36,9 +36,22 @@ public class ConversationService : IConversationService
         {
             throw new ConversationNotFoundException($"There exists no conversation with ID {conversationId}");
         }
+
+        if (sendMessageRequest.SenderUsername != conversation.UserId1 &&
+            sendMessageRequest.SenderUsername != conversation.UserId2)
+        {
+            throw new SenderNotParticipantException(
+                $"The sender with username {sendMessageRequest.SenderUsername} is not a participant of the conversation with ID {conversationId}");
+        }
+        
+        if (await _messageStorage.GetMessage(conversationId, sendMessageRequest.Id) != null)
+        {
+            throw new MessageConflictException(
+                $"There already exists a message with id {sendMessageRequest.Id} in conversation {conversationId}");
+        }
         
         var message = new Message(
-            sendMessageRequest.MessageId,
+            sendMessageRequest.Id,
             sendMessageRequest.Text,
             sendMessageRequest.SenderUsername,
             conversationId,
@@ -47,7 +60,7 @@ public class ConversationService : IConversationService
         
         await _messageStorage.PostMessageToConversation(message);
         await _conversationStorage.UpsertConversation(new PostConversationRequest(conversation.UserId1,
-            conversation.UserId2, message.unixTime));
+            conversation.UserId2, message.UnixTime));
         return message;
     }
 
@@ -82,7 +95,7 @@ public class ConversationService : IConversationService
         return new ListMessageServiceResponseDto(messagesResult, response.ContinuationToken);
     }
 
-    public async Task<StartConversationResponse> StartConversation(StartConversationRequest startConversationRequest)
+    public async Task<AddConversationResponse> StartConversation(AddConversationRequest startConversationRequest)
     {
         if (startConversationRequest.Participants.Length != 2)
         {
@@ -98,9 +111,16 @@ public class ConversationService : IConversationService
         }
         if (String.IsNullOrWhiteSpace(sendMessageRequest.Text) ||
             String.IsNullOrWhiteSpace(sendMessageRequest.SenderUsername) ||
-            String.IsNullOrWhiteSpace(sendMessageRequest.MessageId))
+            String.IsNullOrWhiteSpace(sendMessageRequest.Id))
         {
             throw new ArgumentException($"Invalid message arguments {sendMessageRequest}", nameof(sendMessageRequest));
+        }
+        
+        if (sendMessageRequest.SenderUsername != startConversationRequest.Participants[0] &&
+            sendMessageRequest.SenderUsername != startConversationRequest.Participants[1])
+        {
+            throw new SenderNotParticipantException(
+                $"The sender with username {sendMessageRequest.SenderUsername} is not a participant");
         }
 
         if (await _profileStorage.GetProfile(userId1) == null)
@@ -111,7 +131,7 @@ public class ConversationService : IConversationService
         {
             throw new UserNotFoundException($"The user with username {userId2} was not found");
         }
-        
+
         var conversation = new PostConversationRequest(userId1, userId2, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
         if (await _conversationStorage.GetConversation(conversation.UserId1, conversation.UserId2) != null) {
             throw new ConversationConflictException($"There already exists a conversation between {userId1} and {userId2}");
@@ -119,14 +139,14 @@ public class ConversationService : IConversationService
         string conversationId = await _conversationStorage.UpsertConversation(conversation);
         
         var message = new Message(
-            sendMessageRequest.MessageId,
+            sendMessageRequest.Id,
             sendMessageRequest.Text,
             sendMessageRequest.SenderUsername,
             conversationId,
             conversation.LastModifiedUnixTime
         );
         await _messageStorage.PostMessageToConversation(message);
-        return new StartConversationResponse(conversationId, startConversationRequest.Participants, conversation.LastModifiedUnixTime);
+        return new AddConversationResponse(conversationId, startConversationRequest.Participants, DateTimeOffset.FromUnixTimeSeconds(conversation.LastModifiedUnixTime).DateTime);
     }
 
     public async Task<ListConversationsServiceResponse> EnumerateConversationsOfAGivenUser(   
@@ -178,6 +198,6 @@ public class ConversationService : IConversationService
     
     private static ListMessageResponseItem ToMessageResponse(Message message)
     {
-        return new ListMessageResponseItem(message.text, message.senderUsername, message.unixTime);
+        return new ListMessageResponseItem(message.Text, message.SenderUsername, message.UnixTime);
     }
 }

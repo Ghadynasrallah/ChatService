@@ -12,7 +12,7 @@ public interface IConversationService
         int? limit = null,
         long? lastSeenMessageTime = null);
 
-    public Task<StartConversationResponse> StartConversation(StartConversationRequest startConversationRequestDto);
+    public Task<AddConversationResponse> StartConversation(AddConversationRequest startConversationRequestDto);
 
     public Task<ListConversationsServiceResponse> EnumerateConversationsOfAGivenUser(
         string userId,

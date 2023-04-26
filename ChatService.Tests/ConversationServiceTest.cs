@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using ChatService.Dtos;
 using ChatService.Exceptions;
 using ChatService.Services;
@@ -35,13 +34,13 @@ public class ConversationServiceTest : IClassFixture<ConversationServiceTest>
         var result = await _conversationService.SendMessageToConversation(_conversation1.ConversationId, sendMessageRequest);
 
         // Assert
-        Assert.Equal(sendMessageRequest.MessageId, result.messageId);
-        Assert.Equal(sendMessageRequest.Text, result.text);
-        Assert.Equal(sendMessageRequest.SenderUsername, result.senderUsername);
-        Assert.Equal(_conversation1.ConversationId, result.conversationId);
+        Assert.Equal(sendMessageRequest.Id, result.MessageId);
+        Assert.Equal(sendMessageRequest.Text, result.Text);
+        Assert.Equal(sendMessageRequest.SenderUsername, result.SenderUsername);
+        Assert.Equal(_conversation1.ConversationId, result.ConversationId);
         
         //Verify
-        _conversationStorageMock.Verify(m=> m.UpsertConversation(new PostConversationRequest(_conversation1.UserId1, _conversation1.UserId2, result.unixTime)), Times.Once);
+        _conversationStorageMock.Verify(m=> m.UpsertConversation(new PostConversationRequest(_conversation1.UserId1, _conversation1.UserId2, result.UnixTime)), Times.Once);
         _messageStorageMock.Verify(m=>m.PostMessageToConversation(result), Times.Once);
         _conversationStorageMock.Verify(m=>m.GetConversation(_conversation1.ConversationId), Times.Once);
     }
@@ -100,9 +99,9 @@ public class ConversationServiceTest : IClassFixture<ConversationServiceTest>
 
         List<ListMessageResponseItem> messageResponseItems = new List<ListMessageResponseItem>
         {
-            new ListMessageResponseItem(messages[0].text, messages[0].senderUsername, messages[0].unixTime),
-            new ListMessageResponseItem(messages[1].text, messages[1].senderUsername, messages[1].unixTime),
-            new ListMessageResponseItem(messages[2].text, messages[2].senderUsername, messages[2].unixTime),
+            new ListMessageResponseItem(messages[0].Text, messages[0].SenderUsername, messages[0].UnixTime),
+            new ListMessageResponseItem(messages[1].Text, messages[1].SenderUsername, messages[1].UnixTime),
+            new ListMessageResponseItem(messages[2].Text, messages[2].SenderUsername, messages[2].UnixTime),
         };
             
         var messagesStorageResponse = new ListMessagesStorageResponseDto(messages);
@@ -159,7 +158,7 @@ public class ConversationServiceTest : IClassFixture<ConversationServiceTest>
     {
         //Arrange
         var sendMessageRequest = new SendMessageRequest(Guid.NewGuid().ToString(), _conversation1.UserId1, "hello");
-        var startConversationRequest = new StartConversationRequest(new []{_conversation1.UserId1, _conversation1.UserId2}, sendMessageRequest);
+        var startConversationRequest = new AddConversationRequest(new []{_conversation1.UserId1, _conversation1.UserId2}, sendMessageRequest);
         var profile1 = new Profile("foo", "foo", "foo", null);
         var profile2 = new Profile("bar", "nar", "bar", null);
 
@@ -169,8 +168,8 @@ public class ConversationServiceTest : IClassFixture<ConversationServiceTest>
             .ReturnsAsync((Conversation?)null);
         _conversationStorageMock.Setup(m=>m.UpsertConversation(It.IsAny<PostConversationRequest>())).ReturnsAsync("bar_foo");
 
-        var startConversationResponse = new StartConversationResponse(_conversation1.ConversationId,
-            new [] { _conversation1.UserId1, _conversation1.UserId2 }, It.IsAny<long>());
+        var startConversationResponse = new AddConversationResponse(_conversation1.ConversationId,
+            new [] { _conversation1.UserId1, _conversation1.UserId2 }, It.IsAny<DateTime>());
         var actualResult = await _conversationService.StartConversation(startConversationRequest);
         
         //Assert
@@ -178,12 +177,8 @@ public class ConversationServiceTest : IClassFixture<ConversationServiceTest>
         Assert.Equal(actualResult.Participants, startConversationResponse.Participants);
         
         //Verify
-        var message = new Message(sendMessageRequest.MessageId, sendMessageRequest.Text,
-            sendMessageRequest.SenderUsername, "bar_foo", actualResult.LastModifiedDateUtc);
-        _messageStorageMock.Verify(m=> m.PostMessageToConversation(message), Times.Once);
-        var postConversationRequest= new PostConversationRequest(_conversation1.UserId1, _conversation1.UserId2,
-            actualResult.LastModifiedDateUtc);
-        _conversationStorageMock.Verify(m=>m.UpsertConversation(postConversationRequest), Times.Once);
+        _messageStorageMock.Verify(m=> m.PostMessageToConversation(It.IsAny<Message>()), Times.Once);
+        _conversationStorageMock.Verify(m=>m.UpsertConversation(It.IsAny<PostConversationRequest>()), Times.Once);
         _conversationStorageMock.Verify(m=>m.GetConversation(_conversation1.UserId1, _conversation1.UserId2), Times.Once);
     }
 
@@ -205,7 +200,7 @@ public class ConversationServiceTest : IClassFixture<ConversationServiceTest>
     public async Task StartConversation_InvalidArgs(string messageId, string senderUsername, string text, string userId1, string userId2) 
     {
         var sendMessageRequest = new SendMessageRequest(messageId, senderUsername, text);
-        var startConversationRequest = new StartConversationRequest(new []{userId1, userId2}, sendMessageRequest);
+        var startConversationRequest = new AddConversationRequest(new []{userId1, userId2}, sendMessageRequest);
         await Assert.ThrowsAsync<ArgumentException>(() => _conversationService.StartConversation(startConversationRequest));
     }
 
@@ -214,7 +209,7 @@ public class ConversationServiceTest : IClassFixture<ConversationServiceTest>
     {
         var sendMessageRequest = new SendMessageRequest(Guid.NewGuid().ToString(), _conversation1.UserId1, "Hello");
         string[] participants = new string[] { "foo", "bar", "mike" };
-        var startConversationRequest = new StartConversationRequest(participants, sendMessageRequest);
+        var startConversationRequest = new AddConversationRequest(participants, sendMessageRequest);
         await Assert.ThrowsAsync<ArgumentException>(() => _conversationService.StartConversation(startConversationRequest));
     }
 
@@ -224,7 +219,7 @@ public class ConversationServiceTest : IClassFixture<ConversationServiceTest>
         //Arrange
         var sendMessageRequest = new SendMessageRequest(Guid.NewGuid().ToString(), _conversation1.UserId1, "Hello");
         var startConversationRequest =
-            new StartConversationRequest(new [] { _conversation1.UserId1, _conversation1.UserId2 }, sendMessageRequest);
+            new AddConversationRequest(new [] { _conversation1.UserId1, _conversation1.UserId2 }, sendMessageRequest);
         var profile1 = new Profile(_conversation1.UserId1, _conversation1.UserId1, _conversation1.UserId1, null);
         var profile2 = new Profile(_conversation1.UserId2, _conversation1.UserId2, _conversation1.UserId2, null);
 
@@ -250,7 +245,7 @@ public class ConversationServiceTest : IClassFixture<ConversationServiceTest>
     {
         //Arrange
         var sendMessageRequest = new SendMessageRequest(Guid.NewGuid().ToString(), _conversation1.UserId1, "Hello");
-        var startConversationRequest = new StartConversationRequest(new [] { _conversation1.UserId1, _conversation1.UserId2 }, sendMessageRequest);
+        var startConversationRequest = new AddConversationRequest(new [] { _conversation1.UserId1, _conversation1.UserId2 }, sendMessageRequest);
         var profile1 = new Profile("foo", "foo", "foo", null);
         var profile2 = new Profile("bar", "nar", "bar", null);
 

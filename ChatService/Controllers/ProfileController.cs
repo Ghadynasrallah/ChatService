@@ -1,15 +1,13 @@
 using ChatService.Dtos;
 using ChatService.Exceptions;
 using ChatService.Services;
-using ChatService.Storage;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Azure.Cosmos;
 using ArgumentException = System.ArgumentException;
 
 namespace ChatService.Controllers;
 
 [ApiController]
-[Route("[Controller]")]
+[Route("api/profile")]
 public class ProfileController : ControllerBase
 {
     private readonly IProfileService _profileService;
