@@ -19,7 +19,6 @@ public class ImageService : IImageService
         {
             throw new ArgumentException("Image file is empty");
         }
-
         string imageId = Guid.NewGuid().ToString();
         await _profilePictureStorage.UploadImage(imageId, profilePictureData);
         return imageId;

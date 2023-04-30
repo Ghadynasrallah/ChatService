@@ -16,48 +16,37 @@ public class CosmosConversationStorage : IConversationStorage
 
     private Container container => _cosmosClient.GetDatabase("ChatService").GetContainer("Conversations");
     
-    public async Task<ListConversationsStorageResponse?> EnumerateConversationsForAGivenUser(
+    public async Task<ListConversationsStorageResponse> EnumerateConversationsForAGivenUser(
         string userId,
         string? continuationToken = null,
         int? limit = null,
         long? lastSeenConversationTime = null)
     {
-        try
+        List<Conversation> conversationsResult = new List<Conversation>();
+        var queryOptions = new QueryRequestOptions
         {
-            List<Conversation> conversationsResult = new List<Conversation>();
-            var queryOptions = new QueryRequestOptions
-            {
-                PartitionKey = new PartitionKey(userId),
-                ConsistencyLevel = ConsistencyLevel.Session,
-                MaxItemCount = limit ?? -1
-            };
+            PartitionKey = new PartitionKey(userId),
+            ConsistencyLevel = ConsistencyLevel.Session,
+            MaxItemCount = limit ?? -1
+        };
 
-            var queryText = "SELECT * FROM c ORDER BY c.lastModifiedUnixTime DESC";
-            if (lastSeenConversationTime != null)
-            {
-                queryText = $"SELECT * FROM c WHERE c.lastModifiedUnixTime > {lastSeenConversationTime.ToString()} ORDER BY c.lastModifiedUnixTime DESC";
-            }
-            var iterator = container.GetItemQueryIterator<ConversationEntity>(requestOptions: queryOptions, queryText: queryText, continuationToken: continuationToken);
-            FeedResponse<ConversationEntity>? response = null;
-
-            if (iterator.HasMoreResults)
-            {
-                response = await iterator.ReadNextAsync();
-                foreach (var conversationEntity in response)
-                {
-                    conversationsResult.Add(ToConversation(conversationEntity));
-                }
-            }
-            return new ListConversationsStorageResponse(conversationsResult, response?.ContinuationToken);
-        }
-        catch (CosmosException e)
+        var queryText = "SELECT * FROM c ORDER BY c.lastModifiedUnixTime DESC";
+        if (lastSeenConversationTime != null)
         {
-            if (e.StatusCode == HttpStatusCode.NotFound)
-            {
-                return null;
-            }
-            throw;
+            queryText = $"SELECT * FROM c WHERE c.lastModifiedUnixTime > {lastSeenConversationTime.ToString()} ORDER BY c.lastModifiedUnixTime DESC";
         }
+        var iterator = container.GetItemQueryIterator<ConversationEntity>(requestOptions: queryOptions, queryText: queryText, continuationToken: continuationToken);
+        FeedResponse<ConversationEntity>? response = null;
+
+        if (iterator.HasMoreResults)
+        {
+            response = await iterator.ReadNextAsync();
+            foreach (var conversationEntity in response)
+            {
+                conversationsResult.Add(ToConversation(conversationEntity));
+            }
+        }
+        return new ListConversationsStorageResponse(conversationsResult, response?.ContinuationToken);
     }
     
     public async Task<string> UpsertConversation(PostConversationRequest conversation)
@@ -99,12 +88,6 @@ public class CosmosConversationStorage : IConversationStorage
 
     public async Task<bool> DeleteConversation(string userId1, string userId2)
     {
-        if (String.IsNullOrWhiteSpace(userId1) ||
-            String.IsNullOrWhiteSpace(userId2))
-        {
-            throw new ArgumentException("Invalid arguments");
-        }
-
         try
         {
             string conversationId = GetConversationId(userId1, userId2);

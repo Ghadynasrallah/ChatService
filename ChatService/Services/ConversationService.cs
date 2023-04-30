@@ -70,12 +70,10 @@ public class ConversationService : IConversationService
         int? limit = null,
         long? lastSeenMessageTime = null)
     {
-        List<ListMessageResponseItem> messagesResult = new List<ListMessageResponseItem>();
         if (String.IsNullOrWhiteSpace(conversationId))
         {
             throw new ArgumentException($"Invalid conversation ID {conversationId}");
         }
-
         if (await _conversationStorage.GetConversation(conversationId) == null)
         {
             throw new ConversationNotFoundException($"There exists no conversation with ID {conversationId}");
@@ -87,7 +85,7 @@ public class ConversationService : IConversationService
             throw new MessageNotFoundException(
                 $"There are no messages for the conversation with conversation ID {conversationId}");
         }
-
+        List<ListMessageResponseItem> messagesResult = new List<ListMessageResponseItem>();
         foreach (var message in response.Messages)
         {
             messagesResult.Add(ToMessageResponse(message));
@@ -115,13 +113,6 @@ public class ConversationService : IConversationService
         {
             throw new ArgumentException($"Invalid message arguments {sendMessageRequest}", nameof(sendMessageRequest));
         }
-        
-        if (sendMessageRequest.SenderUsername != startConversationRequest.Participants[0] &&
-            sendMessageRequest.SenderUsername != startConversationRequest.Participants[1])
-        {
-            throw new SenderNotParticipantException(
-                $"The sender with username {sendMessageRequest.SenderUsername} is not a participant");
-        }
 
         if (await _profileStorage.GetProfile(userId1) == null)
         {
@@ -130,6 +121,13 @@ public class ConversationService : IConversationService
         if (await _profileStorage.GetProfile(userId2) == null)
         {
             throw new UserNotFoundException($"The user with username {userId2} was not found");
+        }
+        
+        if (sendMessageRequest.SenderUsername != startConversationRequest.Participants[0] &&
+            sendMessageRequest.SenderUsername != startConversationRequest.Participants[1])
+        {
+            throw new SenderNotParticipantException(
+                $"The sender with username {sendMessageRequest.SenderUsername} is not a participant");
         }
 
         var conversation = new PostConversationRequest(userId1, userId2, DateTimeOffset.UtcNow.ToUnixTimeSeconds());

@@ -4,7 +4,7 @@ namespace ChatService.Storage;
 
 public interface IMessageStorage
 {
-    public Task<ListMessagesStorageResponseDto?> EnumerateMessagesFromAGivenConversation(string conversationId,
+    public Task<ListMessagesStorageResponseDto> EnumerateMessagesFromAGivenConversation(string conversationId,
         string? continuationToken = null,
         int? limit = null,
         long? lastSeenMessageTime = null);

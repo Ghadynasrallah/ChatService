@@ -37,26 +37,7 @@ public class CosmosProfileStorageTest : IClassFixture<WebApplicationFactory<Prog
         await _store.UpsertProfile(_profile);
         Assert.Equal(_profile,  await _store.GetProfile(_profile.Username));
     }
-
-    [Theory]
-    [InlineData(null, "Foo", "Bar")]
-    [InlineData("", "Foo", "Bar")]
-    [InlineData(" ", "Foo", "Bar")]
-    [InlineData("foobar", null, "Bar")]
-    [InlineData("foobar", "", "Bar")]
-    [InlineData("foobar", "   ", "Bar")]
-    [InlineData("foobar", "Foo", "")]
-    [InlineData("foobar", "Foo", null)]
-    [InlineData("foobar", "Foo", " ")]
-    public async Task AddInvalidProfile(string username, string firstName, string lastName)
-    {
-        var profile = new Profile(username, firstName, lastName, Guid.NewGuid().ToString());
-        await Assert.ThrowsAsync<ArgumentException>(async () =>
-        {
-            await _store.UpsertProfile(profile);
-        });
-    }
-
+    
     [Fact] 
     public async Task GetNonExistingProfile()
     {

@@ -49,6 +49,15 @@ public class UserControllerTest : IClassFixture<WebApplicationFactory<Program>>
         var response = await _httpClient.GetAsync($"api/profile/foobar");
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
+    
+    [Fact]
+    public async Task GetProfile_InvalidArgs()
+    {
+        _profileServiceMock.Setup(m => m.GetProfile("foobar")).ThrowsAsync(new ArgumentException());
+
+        var response = await _httpClient.GetAsync($"api/profile/foobar");
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
 
     [Fact]
     public async Task AddProfile()

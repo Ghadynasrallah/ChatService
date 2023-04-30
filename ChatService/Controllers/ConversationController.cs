@@ -1,6 +1,4 @@
-using System.Net;
 using System.Text;
-using System.Web;
 using ChatService.Dtos;
 using ChatService.Exceptions;
 using ChatService.Services;

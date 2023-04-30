@@ -2,11 +2,12 @@ using ChatService.Dtos;
 using ChatService.Exceptions;
 using ChatService.Services;
 using ChatService.Storage;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Moq;
 
 namespace ChatService.Tests;
 
-public class ConversationServiceTest : IClassFixture<ConversationServiceTest>
+public class ConversationServiceTest : IClassFixture<WebApplicationFactory<Program>>
 {
     private readonly Mock<IConversationStorage> _conversationStorageMock = new();
     private readonly Mock<IMessageStorage> _messageStorageMock = new();
@@ -78,6 +79,51 @@ public class ConversationServiceTest : IClassFixture<ConversationServiceTest>
         //Verify
         _conversationStorageMock.Verify(m=> m.UpsertConversation(It.IsAny<PostConversationRequest>()), Times.Never);
         _messageStorageMock.Verify(m=>m.PostMessageToConversation(It.IsAny<Message>()), Times.Never);
+        _conversationStorageMock.Verify(m=>m.GetConversation(_conversation1.ConversationId), Times.Once);
+    }
+    
+    [Fact]
+    public async Task SendMessageToConversation_SenderNotParticipant()
+    {
+        // Arrange
+        var sendMessageRequest = new SendMessageRequest(Guid.NewGuid().ToString(), "NotParticipant", "Hello");
+
+        _conversationStorageMock.Setup(x => x.GetConversation(_conversation1.ConversationId)).ReturnsAsync(_conversation1);
+        _messageStorageMock.Setup(x => x.PostMessageToConversation(It.IsAny<Message>())).Returns(Task.CompletedTask);
+        _conversationStorageMock.Setup(x => x.UpsertConversation(It.IsAny<PostConversationRequest>())).ReturnsAsync(_conversation1.ConversationId);
+        
+        // Assert
+        await Assert.ThrowsAsync<SenderNotParticipantException>(() =>
+            _conversationService.SendMessageToConversation(_conversation1.ConversationId, sendMessageRequest));
+        
+        //Verify
+        _conversationStorageMock.Verify(m=> m.UpsertConversation(It.IsAny<PostConversationRequest>()), Times.Never);
+        _messageStorageMock.Verify(m=>m.PostMessageToConversation(It.IsAny<Message>()), Times.Never);
+        _conversationStorageMock.Verify(m=>m.GetConversation(_conversation1.ConversationId), Times.Once);
+    }
+    
+    [Fact]
+    public async Task SendMessageToConversation_MessageConflict()
+    {
+        // Arrange
+        var sendMessageRequest = new SendMessageRequest(Guid.NewGuid().ToString(), "foo", "Hello");
+        var message = new Message(sendMessageRequest.Id, sendMessageRequest.Text, sendMessageRequest.SenderUsername,
+            _conversation1.ConversationId, 100);
+
+            _conversationStorageMock.Setup(x => x.GetConversation(_conversation1.ConversationId)).ReturnsAsync(_conversation1);
+        _messageStorageMock.Setup(x => x.PostMessageToConversation(It.IsAny<Message>())).Returns(Task.CompletedTask);
+        _messageStorageMock.Setup(x => x.GetMessage(_conversation1.ConversationId, sendMessageRequest.Id))
+            .ReturnsAsync(message);
+        _conversationStorageMock.Setup(x => x.UpsertConversation(It.IsAny<PostConversationRequest>())).ReturnsAsync(_conversation1.ConversationId);
+        
+        // Assert
+        await Assert.ThrowsAsync<MessageConflictException>(() =>
+            _conversationService.SendMessageToConversation(_conversation1.ConversationId, sendMessageRequest));
+        
+        //Verify
+        _conversationStorageMock.Verify(m=> m.UpsertConversation(It.IsAny<PostConversationRequest>()), Times.Never);
+        _messageStorageMock.Verify(m=>m.PostMessageToConversation(It.IsAny<Message>()), Times.Never);
+        _messageStorageMock.Verify(m=>m.GetMessage(_conversation1.ConversationId, sendMessageRequest.Id), Times.Once);
         _conversationStorageMock.Verify(m=>m.GetConversation(_conversation1.ConversationId), Times.Once);
     }
 
@@ -231,13 +277,26 @@ public class ConversationServiceTest : IClassFixture<ConversationServiceTest>
         
         //Assert
         await Assert.ThrowsAsync<UserNotFoundException>(() => _conversationService.StartConversation(startConversationRequest));
-        
+    }
+    
+    [Fact]
+    public async Task StartConversation_SenderNotParticipant()
+    {
         //Arrange
+        var sendMessageRequest = new SendMessageRequest(Guid.NewGuid().ToString(), "NotParticipant", "Hello");
+        var startConversationRequest =
+            new AddConversationRequest(new [] { _conversation1.UserId1, _conversation1.UserId2 }, sendMessageRequest);
+        var profile1 = new Profile(_conversation1.UserId1, _conversation1.UserId1, _conversation1.UserId1, null);
+        var profile2 = new Profile(_conversation1.UserId2, _conversation1.UserId2, _conversation1.UserId2, null);
+
         _profileStorageMock.Setup(m => m.GetProfile(profile1.Username)).ReturnsAsync(profile1);
+        _profileStorageMock.Setup(m => m.GetProfile(profile2.Username)).ReturnsAsync(profile2);
+        _conversationStorageMock.Setup(m => m.GetConversation(_conversation1.UserId1, _conversation1.UserId2))
+            .ReturnsAsync((Conversation?)null);
+        _conversationStorageMock.Setup(m=>m.UpsertConversation(It.IsAny<PostConversationRequest>())).ReturnsAsync("bar_foo");
         
         //Assert
-        await Assert.ThrowsAsync<UserNotFoundException>(() =>
-            _conversationService.StartConversation(startConversationRequest));
+        await Assert.ThrowsAsync<SenderNotParticipantException>(() => _conversationService.StartConversation(startConversationRequest));
     }
 
     [Fact]

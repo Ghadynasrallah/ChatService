@@ -1,6 +1,5 @@
 using System.Net;
 using ChatService.Dtos;
-using ChatService.Exceptions;
 using ChatService.Storage.Entities;
 using Microsoft.Azure.Cosmos;
 
@@ -17,45 +16,36 @@ public class CosmosMessageStorage : IMessageStorage
 
     private Container container => _cosmosClient.GetDatabase("ChatService").GetContainer("Messages");
     
-    public async Task<ListMessagesStorageResponseDto?> EnumerateMessagesFromAGivenConversation(
+    public async Task<ListMessagesStorageResponseDto> EnumerateMessagesFromAGivenConversation(
         string conversationId,
         string? continuationToken = null,
         int? limit = null,
         long? lastSeenMessageTime = null)
     {
-        try
+        List<Message> messagesResult = new List<Message>();
+        var queryOptions = new QueryRequestOptions
         {
-            List<Message> messagesResult = new List<Message>();
-            var queryOptions = new QueryRequestOptions
-            {
-                PartitionKey = new PartitionKey(conversationId),
-                ConsistencyLevel = ConsistencyLevel.Session,
-                MaxItemCount = limit ?? -1
-            };
-            
-            var queryText = "SELECT * FROM c ORDER BY c.unixTime DESC";
-            if (lastSeenMessageTime != null)
-            { 
-                queryText = $"SELECT * FROM c WHERE c.unixTime > {lastSeenMessageTime.ToString()} ORDER BY c.unixTime DESC";
-            }
-            var iterator = container.GetItemQueryIterator<MessageEntity>(requestOptions: queryOptions, queryText: queryText, continuationToken: continuationToken);
-            FeedResponse<MessageEntity>? response = null;
-            if (iterator.HasMoreResults)
-            {
-                response = await iterator.ReadNextAsync();
-                foreach (var messageEntity in response)
-                {
-                    messagesResult.Add(ToMessage(messageEntity));
-                }
-            }
-            return new ListMessagesStorageResponseDto(messagesResult, response?.ContinuationToken);
+            PartitionKey = new PartitionKey(conversationId),
+            ConsistencyLevel = ConsistencyLevel.Session,
+            MaxItemCount = limit ?? -1
+        };
+        
+        var queryText = "SELECT * FROM c ORDER BY c.unixTime DESC";
+        if (lastSeenMessageTime != null)
+        { 
+            queryText = $"SELECT * FROM c WHERE c.unixTime > {lastSeenMessageTime.ToString()} ORDER BY c.unixTime DESC";
         }
-        catch (CosmosException e)
+        var iterator = container.GetItemQueryIterator<MessageEntity>(requestOptions: queryOptions, queryText: queryText, continuationToken: continuationToken);
+        FeedResponse<MessageEntity>? response = null;
+        if (iterator.HasMoreResults)
         {
-            if (e.StatusCode == HttpStatusCode.NotFound)
-                return null;
-            throw;
+            response = await iterator.ReadNextAsync();
+            foreach (var messageEntity in response)
+            {
+                messagesResult.Add(ToMessage(messageEntity));
+            }
         }
+        return new ListMessagesStorageResponseDto(messagesResult, response?.ContinuationToken);
     }
     
     public async Task PostMessageToConversation(Message message)

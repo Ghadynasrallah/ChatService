@@ -3,7 +3,6 @@ using ChatService.Exceptions;
 using ChatService.Services;
 using Microsoft.AspNetCore.Mvc;
 
-
 namespace ChatService.Controllers;
 
 [ApiController]

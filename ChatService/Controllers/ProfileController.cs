@@ -24,11 +24,11 @@ public class ProfileController : ControllerBase
         {
             return Ok(await _profileService.GetProfile(username));
         }
-        catch (UserNotFoundException exception)
+        catch (UserNotFoundException)
         {
             return NotFound($"The user with user ID {username} was not found");
         }
-        catch (ArgumentException exception)
+        catch (ArgumentException)
         {
             return BadRequest($"Invalid username: username cannot be null or empty");
         }
@@ -61,7 +61,7 @@ public class ProfileController : ControllerBase
         }
         catch (ArgumentException)
         {
-            return BadRequest($"Invalid Arguments: Username, FirstName, LastName cannot be null or empty");
+            return BadRequest($"Invalid Arguments: Username, FirstName, and LastName cannot be null or empty");
         }
         catch (UserNotFoundException)
         {

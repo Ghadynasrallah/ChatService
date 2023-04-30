@@ -22,7 +22,7 @@ public class ConversationControllerTest :  IClassFixture<WebApplicationFactory<P
     {
         _httpClient = factory.WithWebHostBuilder(builder =>
         {
-            builder.ConfigureTestServices(services => { services.AddSingleton(_conversationServiceMock.Object); });
+            builder.ConfigureTestServices(services => { services.AddSingleton(_conversationServiceMock.Object);});
         }).CreateClient();
     }
 
@@ -50,6 +50,57 @@ public class ConversationControllerTest :  IClassFixture<WebApplicationFactory<P
         var sendMessageRequest = new SendMessageRequest(_message1.MessageId, _message1.SenderUsername, _message1.Text);
         _conversationServiceMock.Setup(m => m.SendMessageToConversation(_conversation1.ConversationId, sendMessageRequest))
             .ThrowsAsync(new ArgumentException());
+        
+        //Act
+        var response = await _httpClient.PostAsync($"api/conversations/{_conversation1.ConversationId}/messages",
+            new StringContent(JsonConvert.SerializeObject(sendMessageRequest), Encoding.Default, "application/json"));
+        
+        //Assert and Verify
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        _conversationServiceMock.Verify(mock => mock.SendMessageToConversation(_conversation1.ConversationId, sendMessageRequest), Times.Once);
+    }
+
+    [Fact]
+    public async Task SendMessage_MessageConflict()
+    {
+        //Setup
+        var sendMessageRequest = new SendMessageRequest(_message1.MessageId, _message1.SenderUsername, _message1.Text);
+        _conversationServiceMock.Setup(m => m.SendMessageToConversation(_conversation1.ConversationId, sendMessageRequest))
+            .ThrowsAsync(new MessageConflictException());
+        
+        //Act
+        var response = await _httpClient.PostAsync($"api/conversations/{_conversation1.ConversationId}/messages",
+            new StringContent(JsonConvert.SerializeObject(sendMessageRequest), Encoding.Default, "application/json"));
+        
+        //Assert and Verify
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        _conversationServiceMock.Verify(mock => mock.SendMessageToConversation(_conversation1.ConversationId, sendMessageRequest), Times.Once);
+    }
+    
+    [Fact]
+    public async Task SendMessage_ConversationNotFound()
+    {
+        //Setup
+        var sendMessageRequest = new SendMessageRequest(_message1.MessageId, _message1.SenderUsername, _message1.Text);
+        _conversationServiceMock.Setup(m => m.SendMessageToConversation(_conversation1.ConversationId, sendMessageRequest))
+            .ThrowsAsync(new ConversationNotFoundException());
+        
+        //Act
+        var response = await _httpClient.PostAsync($"api/conversations/{_conversation1.ConversationId}/messages",
+            new StringContent(JsonConvert.SerializeObject(sendMessageRequest), Encoding.Default, "application/json"));
+        
+        //Assert and Verify
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        _conversationServiceMock.Verify(mock => mock.SendMessageToConversation(_conversation1.ConversationId, sendMessageRequest), Times.Once);
+    }
+    
+    [Fact]
+    public async Task SendMessage_SenderNotParticipant()
+    {
+        //Setup
+        var sendMessageRequest = new SendMessageRequest(_message1.MessageId, _message1.SenderUsername, _message1.Text);
+        _conversationServiceMock.Setup(m => m.SendMessageToConversation(_conversation1.ConversationId, sendMessageRequest))
+            .ThrowsAsync(new SenderNotParticipantException());
         
         //Act
         var response = await _httpClient.PostAsync($"api/conversations/{_conversation1.ConversationId}/messages",
@@ -199,6 +250,25 @@ public class ConversationControllerTest :  IClassFixture<WebApplicationFactory<P
 
         //Assert and Verify
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        _conversationServiceMock.Verify(m=>m.StartConversation(It.IsAny<AddConversationRequest>()), Times.Once);
+    }
+    
+    [Fact]
+    public async Task StartConversation_SenderNotParticipant() 
+    {
+        //Setup
+        var sendMessageRequest = new SendMessageRequest(_message1.MessageId, _message1.SenderUsername, _message1.Text);
+        var participants = new []{"foo", "bar"};
+        var startConversationRequest = new AddConversationRequest(participants, sendMessageRequest);
+        _conversationServiceMock.Setup(m => m.StartConversation(It.IsAny<AddConversationRequest>()))
+            .ThrowsAsync(new SenderNotParticipantException());
+
+        //Act
+        var response = await _httpClient.PostAsync("api/conversations/",
+            new StringContent(JsonConvert.SerializeObject(startConversationRequest), Encoding.Default, "application/json"));
+
+        //Assert and Verify
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         _conversationServiceMock.Verify(m=>m.StartConversation(It.IsAny<AddConversationRequest>()), Times.Once);
     }
     

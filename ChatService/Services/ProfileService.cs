@@ -35,13 +35,11 @@ public class ProfileService : IProfileService
         {
             throw new ArgumentException($"Invalid profile {profile}", nameof(profile));
         }
-
         var existingProfile = await _profileStorage.GetProfile(profile.Username);
         if (existingProfile != null)
         {
             throw new UserConflictException($"A user with username {profile.Username} already exists");
         }
-
         await _profileStorage.UpsertProfile(profile);
     }
 

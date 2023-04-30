@@ -1,10 +1,7 @@
 using System.Net;
 using Microsoft.Azure.Cosmos;
 using ChatService.Dtos;
-using ChatService.Exceptions;
 using ChatService.Storage.Entities;
-
-
 
 namespace ChatService.Storage;
 
@@ -21,13 +18,6 @@ public class CosmosProfileStorage : IProfileStorage
     
     public async Task UpsertProfile(Profile profile)
     {
-        if (string.IsNullOrWhiteSpace(profile.Username) ||
-            string.IsNullOrWhiteSpace(profile.FirstName) ||
-            string.IsNullOrWhiteSpace(profile.LastName))
-        {
-            throw new ArgumentException($"Invalid profile {profile}", nameof(profile));
-        }
-
         await container.UpsertItemAsync(ToEntity(profile));
     }
 
@@ -57,9 +47,13 @@ public class CosmosProfileStorage : IProfileStorage
     { 
         try
         {
-            await container.DeleteItemAsync<Profile>(
+            await container.DeleteItemAsync<ProfileEntity>(
+                id: username,
                 partitionKey: new PartitionKey(username),
-                id: username
+                new ItemRequestOptions
+                {
+                    ConsistencyLevel = ConsistencyLevel.Session
+                }
             );
         }
         catch (CosmosException e)
@@ -68,7 +62,6 @@ public class CosmosProfileStorage : IProfileStorage
             {
                 return;
             }
-
             throw;
         }
     }

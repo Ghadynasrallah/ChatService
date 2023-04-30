@@ -53,6 +53,13 @@ public class CosmosConversationStorageTest :  IClassFixture<WebApplicationFactor
     }
 
     [Fact]
+    public async Task GetConversation()
+    {
+        await _store.UpsertConversation(_postConversation1);
+        Assert.Equal(_conversation1, await _store.GetConversation(_conversation1.ConversationId));
+    }
+    
+    [Fact]
     public async Task GetNonExistingConversation()
     {
         Assert.Null(await _store.GetConversation("mike", "bar"));
@@ -143,5 +150,14 @@ public class CosmosConversationStorageTest :  IClassFixture<WebApplicationFactor
 
         var realConversationsForJohn = await _store.EnumerateConversationsForAGivenUser("john", null, null, 100201);
         Assert.Equal(expectedConversationsForJohn, realConversationsForJohn?.Conversations);
+    }
+
+    [Fact]
+    public async Task EnumerateConversations_NotFound()
+    {
+        var expectedResponse = new ListConversationsStorageResponse(new List<Conversation>());
+        var actualResponse = await _store.EnumerateConversationsForAGivenUser("ghady");
+        Assert.Equal(expectedResponse.Conversations, actualResponse.Conversations);
+        Assert.Null(actualResponse.ContinuationToken);
     }
 }

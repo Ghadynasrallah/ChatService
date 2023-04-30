@@ -22,12 +22,10 @@ public class CloudBlobProfilePictureStorage : IProfilePictureStorage
     public async Task<Stream?> DownloadImage(string profilePictureId)
     {
         BlobClient blobClient = _blobContainerClient.GetBlobClient(profilePictureId);
-
         if (! await blobClient.ExistsAsync())
         {
             return null;
         }
-
         Stream imageData = new MemoryStream();
         var downloadResponse = await blobClient.DownloadAsync();
         await downloadResponse.Value.Content.CopyToAsync(imageData);
@@ -37,10 +35,6 @@ public class CloudBlobProfilePictureStorage : IProfilePictureStorage
 
     public async Task DeleteImage(string profilePictureId)
     {
-        if (String.IsNullOrWhiteSpace(profilePictureId))
-        {
-            throw new ArgumentException("The profile picture ID is invalid: ID does not contain any text");
-        }
         BlobClient blobClient = _blobContainerClient.GetBlobClient(profilePictureId);
         await blobClient.DeleteIfExistsAsync();
     }
