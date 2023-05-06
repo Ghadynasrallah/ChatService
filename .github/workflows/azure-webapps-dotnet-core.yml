@@ -26,7 +26,10 @@ env:
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
+      - ChattingNewFeatures
+      
   workflow_dispatch:
 
 permissions:
