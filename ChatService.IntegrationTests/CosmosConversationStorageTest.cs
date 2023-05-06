@@ -47,16 +47,29 @@ public class CosmosConversationStorageTest :  IClassFixture<WebApplicationFactor
     }
     
     [Fact]
-    public async Task GetConversation()
+    public async Task GetConversation_WithConversationId()
     {
         await _store.UpsertConversation(_postConversation1);
         Assert.Equal(_conversation1, await _store.GetConversation(_conversation1.ConversationId));
     }
+
+    [Fact]
+    public async Task GetConversation_WithUserIds()
+    {
+        await _store.UpsertConversation(_postConversation2);
+        Assert.Equal(_conversation2, await _store.GetConversation(_conversation2.UserId1, _conversation2.UserId2));
+    }
     
     [Fact]
-    public async Task GetNonExistingConversation()
+    public async Task GetConversation_NotFound()
     {
         Assert.Null(await _store.GetConversation("mike", "bar"));
+    }
+
+    [Fact]
+    public async Task GetConversation_InvalidConversationId()
+    {
+        await Assert.ThrowsAsync<ArgumentException>(() => _store.GetConversation("foobar"));
     }
 
     [Fact]

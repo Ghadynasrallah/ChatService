@@ -81,9 +81,12 @@ public class CosmosConversationStorage : IConversationStorage
 
     public async Task<Conversation?> GetConversation(string conversationId)
     {
-        string userId1 = conversationId.Split("_")[0];
-        string userId2 = conversationId.Split("_")[1];
-        return await GetConversation(userId1, userId2);
+        string[] userIds = conversationId.Split("_");
+        if (userIds.Length != 2)
+        {
+            throw new ArgumentException($"Invalid conversation ID {conversationId}");
+        }
+        return await GetConversation(userIds[0], userIds[1]);
     }
 
     public async Task<bool> DeleteConversation(string userId1, string userId2)
