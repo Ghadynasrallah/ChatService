@@ -11,61 +11,93 @@ namespace ChatService.Controllers;
 public class ProfileController : ControllerBase
 {
     private readonly IProfileService _profileService;
+    private readonly ILogger<ProfileController> _logger;
 
-    public ProfileController(IProfileService profileService)
+    public ProfileController(IProfileService profileService, ILogger<ProfileController> logger)
     {
         _profileService = profileService;
+        _logger = logger;
     }
 
     [HttpGet("{username}")]
     public async Task<ActionResult<Profile>> GetProfile([FromRoute] string username)
     {
-        try
+        using (_logger.BeginScope("{Username}", username))
         {
-            return Ok(await _profileService.GetProfile(username));
-        }
-        catch (UserNotFoundException)
-        {
-            return NotFound($"The user with user ID {username} was not found");
-        }
-        catch (ArgumentException)
-        {
-            return BadRequest($"Invalid username: username cannot be null or empty");
+            try
+            {
+                var profile = await _profileService.GetProfile(username);
+                _logger.LogInformation("Profile retrieved successfully. User ID: {ProfileUsername}", username);
+                return Ok(profile);
+            }
+            catch (UserNotFoundException)
+            {
+                _logger.LogWarning("User with id {ProfileUsername} was not found", username);
+                return NotFound($"The user with user ID {username} was not found");
+            }
+            catch (ArgumentException)
+            {
+                _logger.LogWarning("Invalid username: username cannot be null or empty");
+                return BadRequest($"Invalid username: username cannot be null or empty");
+            }
         }
     }
 
     [HttpPost]
     public async Task<ActionResult<Profile>> AddProfile(Profile profile)
     {
-        try
+        using (_logger.BeginScope("{Username}", profile.Username))
         {
-            await _profileService.AddProfile(profile);
-            return CreatedAtAction(nameof(GetProfile), new { username = profile.Username }, profile);
-        }
-        catch (ArgumentException)
-        {
-            return BadRequest($"Invalid profile arguments {profile}");
-        }
-        catch (UserConflictException)
-        {
-            return Conflict($"A user with username {profile.Username} already exists");
+            try
+            {
+                await _profileService.AddProfile(profile);
+                _logger.LogInformation("Added profile with username {ProfileUsername}", profile.Username);
+                return CreatedAtAction(nameof(GetProfile), new { username = profile.Username }, profile);
+            }
+            catch (ArgumentException)
+            {
+                _logger.LogWarning("Invalid profile arguments {Profile}", profile);
+                return BadRequest($"Invalid profile arguments {profile}");
+            }
+            catch (UserConflictException)
+            {
+                _logger.LogWarning("A user with username {ProfileUsername} already exists", profile.Username);
+                return Conflict($"A user with username {profile.Username} already exists");
+            }
+            catch
+            {
+                _logger.LogError("An error occured while adding the profile with username {ProfileUsername}", profile.Username);
+                throw;
+            }
         }
     }
 
     [HttpPut("{username}")]
     public async Task<ActionResult<Profile>> UpdateProfile(string username, [FromBody] PutProfileRequest putProfile)
     {
-        try
+        using (_logger.BeginScope("{Username}", username))
         {
-            return Ok(await _profileService.UpdateProfile(username, putProfile));
-        }
-        catch (ArgumentException)
-        {
-            return BadRequest($"Invalid Arguments: Username, FirstName, and LastName cannot be null or empty");
-        }
-        catch (UserNotFoundException)
-        {
-            return NotFound($"The user with username {username} was not found");
+            try
+            {
+                var updatedProfile = await _profileService.UpdateProfile(username, putProfile);
+                _logger.LogInformation("Updated profile with username {ProfileUsername}", username);
+                return Ok(updatedProfile);
+            }
+            catch (ArgumentException)
+            {
+                _logger.LogWarning("Invalid profile arguments {PutProfile}", putProfile);
+                return BadRequest($"Invalid Arguments: Username, FirstName, and LastName cannot be null or empty");
+            }
+            catch (UserNotFoundException)
+            {
+                _logger.LogWarning("The user with username {username} was not found", username);
+                return NotFound($"The user with username {username} was not found");
+            }
+            catch
+            {
+                _logger.LogError("There was an error updating the profile with username {ProfileUsername}", username);
+                throw;
+            }
         }
     }
 }

@@ -11,38 +11,64 @@ namespace ChatService.Controllers;
 public class ConversationController : ControllerBase
 {
     private readonly IConversationService _conversationService;
-    public ConversationController(IConversationService conversationService)
+    private readonly ILogger<ConversationController> _logger;
+    public ConversationController(IConversationService conversationService, ILogger<ConversationController> logger)
     {
         _conversationService = conversationService;
+        _logger = logger;
     }
 
     [HttpPost("{conversationId}/messages")]
     public async Task<ActionResult<SendMessageResponse>> SendMessageToConversation([FromRoute] string conversationId, [FromBody] SendMessageRequest sendMessageRequest)
     {
-        try
+        using (_logger.BeginScope(new Dictionary<string, object>
+               {
+                   { "ConversationId", conversationId },
+                   { "SenderUsername", sendMessageRequest.SenderUsername }
+               }))
         {
-            var message = await _conversationService.SendMessageToConversation(conversationId, sendMessageRequest);
-            return CreatedAtAction(nameof(EnumerateMessagesInAConversation),
-                new { conversationId = message.ConversationId },
-                new SendMessageResponse(message.UnixTime));
-        }
-        catch (ArgumentException)
-        {
-            return BadRequest($"Invalid message {sendMessageRequest}");
-        }
-        catch (MessageConflictException)
-        {
-            return Conflict(
-                $"There already exists a message with id {sendMessageRequest.Id} in conversation {conversationId}");
-        }
-        catch (ConversationNotFoundException)
-        {
-            return NotFound($"There exists no conversation with ID {conversationId}");
-        }
-        catch (SenderNotParticipantException)
-        {
-            return BadRequest(
-                $"The sender with username {sendMessageRequest.SenderUsername} is not a participant of the conversation with ID {conversationId}");
+            try
+            {
+                var message = await _conversationService.SendMessageToConversation(conversationId, sendMessageRequest);
+                _logger.LogInformation(
+                    "Message sent successfully. Conversation ID: {ConversationId}, Message ID: {MessageId}",
+                    conversationId, message.MessageId);
+                return CreatedAtAction(nameof(EnumerateMessagesInAConversation),
+                    new { conversationId = message.ConversationId },
+                    new SendMessageResponse(message.UnixTime));
+            }
+            catch (ArgumentException)
+            {
+                _logger.LogWarning("Invalid message arguments {SendMessageRequest}", sendMessageRequest);
+                return BadRequest($"Invalid message {sendMessageRequest}");
+            }
+            catch (MessageConflictException)
+            {
+                _logger.LogWarning(
+                    "There already exists a message with id {MessageId} in conversation {ConversationId}",
+                    sendMessageRequest.Id, conversationId);
+                return Conflict(
+                    $"There already exists a message with id {sendMessageRequest.Id} in conversation {conversationId}");
+            }
+            catch (ConversationNotFoundException)
+            {
+                _logger.LogWarning("There exists no conversation with ID {ConversationId}", conversationId);
+                return NotFound($"There exists no conversation with ID {conversationId}");
+            }
+            catch (SenderNotParticipantException)
+            {
+                _logger.LogWarning(
+                    "The sender with username {SenderUsername} is not a participant of the conversation with ID {ConversationId}",
+                    sendMessageRequest.SenderUsername, conversationId);
+                return BadRequest(
+                    $"The sender with username {sendMessageRequest.SenderUsername} is not a participant of the conversation with ID {conversationId}");
+            }
+            catch
+            {
+                _logger.LogError("There was an error sending the message with id {MessageId} to conversation {ConversationId}",
+                    sendMessageRequest.Id, conversationId);
+                throw;
+            }
         }
     }
 
@@ -53,32 +79,43 @@ public class ConversationController : ControllerBase
         [FromQuery] int? limit = null,
         [FromQuery] long? lastSeenMessageTime = null)
     {
-        try
+        using (_logger.BeginScope("{ConversationId}", conversationId))
         {
-            string? decodedContinuationToken = null;
-            if (continuationToken != null)
+            try
             {
-                decodedContinuationToken = Encoding.UTF8.GetString(Convert.FromBase64String(continuationToken));
+                string? decodedContinuationToken = null;
+                if (continuationToken != null)
+                {
+                    decodedContinuationToken = Encoding.UTF8.GetString(Convert.FromBase64String(continuationToken));
+                }
+                var messagesStorageResponseDto = await _conversationService.EnumerateMessagesInAConversation(conversationId,
+                    decodedContinuationToken, limit, lastSeenMessageTime);
+                string? nextUri = null;
+                if (messagesStorageResponseDto.ContinuationToken != null)
+                {
+                    var encodedContinuationToken =
+                        Convert.ToBase64String(Encoding.UTF8.GetBytes(messagesStorageResponseDto.ContinuationToken));
+                    nextUri =
+                        $"api/conversations/{conversationId}/messages?lastSeenMessageTime={lastSeenMessageTime}&limit={limit}&continuationToken={encodedContinuationToken}";
+                }
+                _logger.LogInformation("Messages enumerated successfully for conversation: {ConversationId}", conversationId);
+                return Ok(new ListMessageResponse(messagesStorageResponseDto.Messages, nextUri));
             }
-            var messagesStorageResponseDto = await _conversationService.EnumerateMessagesInAConversation(conversationId,
-                decodedContinuationToken, limit, lastSeenMessageTime);
-            string? nextUri = null;
-            if (messagesStorageResponseDto.ContinuationToken != null)
+            catch (ArgumentException)
             {
-                var encodedContinuationToken =
-                    Convert.ToBase64String(Encoding.UTF8.GetBytes(messagesStorageResponseDto.ContinuationToken));
-                nextUri =
-                    $"api/conversations/{conversationId}/messages?lastSeenMessageTime={lastSeenMessageTime}&limit={limit}&continuationToken={encodedContinuationToken}";
+                _logger.LogWarning("Invalid conversation ID: {ConversationId}", conversationId);
+                return BadRequest($"Invalid conversation ID {conversationId}");
             }
-            return Ok(new ListMessageResponse(messagesStorageResponseDto.Messages, nextUri));
-        }
-        catch (ArgumentException)
-        {
-            return BadRequest($"Invalid conversation ID {conversationId}");
-        }
-        catch (ConversationNotFoundException)
-        {
-            return NotFound($"There exists no conversation with ID {conversationId}");
+            catch (ConversationNotFoundException)
+            {
+                _logger.LogWarning("Conversation not found: {ConversationId}", conversationId);
+                return NotFound($"There exists no conversation with ID {conversationId}");
+            }
+            catch
+            {
+                _logger.LogError("An error occurred while enumerating messages for conversation: {ConversationId}", conversationId);
+                throw; 
+            }
         }
     }
 
@@ -86,29 +123,51 @@ public class ConversationController : ControllerBase
     public async Task<ActionResult<AddConversationResponse>> StartConversation(
         [FromBody] AddConversationRequest startConversationRequest)
     {
-        try
+        var userId1 = startConversationRequest.Participants[0];
+        var userId2 = startConversationRequest.Participants[1];
+        using (_logger.BeginScope(new Dictionary<string, object>
+               {
+                   { "UserId1", userId1},
+                   { "UserId2", userId2 }
+               }))
         {
-            var startConversationResponse =
-                await _conversationService.StartConversation(startConversationRequest);
-            return CreatedAtAction(nameof(EnumerateConversationsOfAGivenUser),
-                new { userId = startConversationResponse.Participants[0] },
-                startConversationResponse);
-        }
-        catch (ArgumentException exception)
-        {
-            return BadRequest(exception.Message);
-        }
-        catch (UserNotFoundException exception)
-        {
-            return NotFound(exception.Message);
-        }
-        catch (ConversationConflictException exception)
-        {
-            return Conflict(exception.Message);
-        }
-        catch (SenderNotParticipantException)
-        {
-            return BadRequest($"The sender with username {startConversationRequest.FirstMessage.SenderUsername} is not a participant");
+            try
+            {
+                var startConversationResponse =
+                    await _conversationService.StartConversation(startConversationRequest);
+                _logger.LogInformation("Conversation started successfully. Conversation ID: {ConversationId}",
+                    startConversationResponse.Id);
+                return CreatedAtAction(nameof(EnumerateConversationsOfAGivenUser),
+                    new { userId = startConversationResponse.Participants[0] },
+                    startConversationResponse);
+            }
+            catch (ArgumentException exception)
+            {
+                _logger.LogWarning("Invalid Arguments {AddConversationRequest}", startConversationRequest);
+                return BadRequest(exception.Message);
+            }
+            catch (UserNotFoundException exception)
+            {
+                _logger.LogWarning("User not found. UserId 1: {UserId1}, UserId 2: {UserId2}", userId1, userId2);
+                return NotFound(exception.Message);
+            }
+            catch (ConversationConflictException exception)
+            {
+                _logger.LogWarning("Conversation conflict. UserId 1: {UserId1}, UserId 2: {UserId2}", userId1, userId2);
+                return Conflict(exception.Message);
+            }
+            catch (SenderNotParticipantException)
+            {
+                _logger.LogWarning("Sender {SenderUsername} is not a participant",
+                    startConversationRequest.FirstMessage.SenderUsername);
+                return BadRequest(
+                    $"The sender with username {startConversationRequest.FirstMessage.SenderUsername} is not a participant");
+            }
+            catch
+            {
+                _logger.LogError("There was an error starting the conversation {AddConversationRequest}", startConversationRequest);
+                throw;
+            }
         }
     }
 
@@ -119,33 +178,47 @@ public class ConversationController : ControllerBase
         [FromQuery] int? limit = null,
         [FromQuery] long? lastSeenConversationTime = null)
     {
-        try
+        using (_logger.BeginScope("Username", username))
         {
-            string? decodedContinuationToken = null;
-            if (continuationToken != null)
+            try
             {
-                decodedContinuationToken = Encoding.UTF8.GetString(Convert.FromBase64String(continuationToken));
+                string? decodedContinuationToken = null;
+                if (continuationToken != null)
+                {
+                    decodedContinuationToken = Encoding.UTF8.GetString(Convert.FromBase64String(continuationToken));
+                }
+
+                var conversationsStorageResponseDto =
+                    await _conversationService.EnumerateConversationsOfAGivenUser(username, decodedContinuationToken,
+                        limit, lastSeenConversationTime);
+                string? nextUri = null;
+                if (conversationsStorageResponseDto.ContinuationToken != null)
+                {
+                    var encodedContinuationToken =
+                        Convert.ToBase64String(
+                            Encoding.UTF8.GetBytes(conversationsStorageResponseDto.ContinuationToken));
+                    nextUri =
+                        $"api/conversations?username={username}&limit={limit}&lastSeenConversationTime={lastSeenConversationTime}&continuationToken={encodedContinuationToken}";
+                }
+                _logger.LogInformation("Conversations enumerated successfully for user: {Username}", username);
+                return Ok(new ListConversationsResponse(conversationsStorageResponseDto.Conversations,
+                    nextUri));
             }
-            var conversationsStorageResponseDto =
-                await _conversationService.EnumerateConversationsOfAGivenUser(username, decodedContinuationToken, limit, lastSeenConversationTime);
-            string? nextUri = null;
-            if (conversationsStorageResponseDto.ContinuationToken != null)
+            catch (ArgumentException)
             {
-                var encodedContinuationToken =
-                    Convert.ToBase64String(Encoding.UTF8.GetBytes(conversationsStorageResponseDto.ContinuationToken));
-                nextUri =
-                    $"api/conversations?username={username}&limit={limit}&lastSeenConversationTime={lastSeenConversationTime}&continuationToken={encodedContinuationToken}";
+                _logger.LogWarning("Invalid user ID");
+                return BadRequest($"Invalid user ID");
             }
-            return Ok(new ListConversationsResponse(conversationsStorageResponseDto.Conversations,
-                nextUri));
-        }
-        catch (ArgumentException)
-        {
-            return BadRequest($"Invalid user ID");
-        }
-        catch (UserNotFoundException)
-        {
-            return NotFound($"The user with username {username} was not found");
+            catch (UserNotFoundException)
+            {
+                _logger.LogWarning("User not found: {Username}", username);
+                return NotFound($"The user with username {username} was not found");
+            } 
+            catch 
+            {
+                _logger.LogError( "An error occurred while enumerating conversations for user: {Username}", username);
+                throw; 
+            }
         }
     }
 }
