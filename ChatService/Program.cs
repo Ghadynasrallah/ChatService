@@ -4,6 +4,7 @@ using ChatService.Configuration;
 using ChatService.Storage;
 using Azure.Storage.Blobs;
 using ChatService.Services;
+using Microsoft.Extensions.Logging.ApplicationInsights;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,9 +16,21 @@ builder.Services.AddSwaggerGen();
 // Add Configuration
 builder.Services.Configure<CosmosSettings>(builder.Configuration.GetSection("Cosmos"));
 builder.Services.Configure<AzureBlobSettings>(builder.Configuration.GetSection("AzureBlob"));
+builder.Services.Configure<ApplicationInsightSettings>(builder.Configuration.GetSection("ApplicationInsights"));
 
 // The following line enables Application Insights telemetry collection.
-builder.Services.AddApplicationInsightsTelemetry();
+var appInsightsSettings = builder.Services.BuildServiceProvider().GetRequiredService<IOptions<ApplicationInsightSettings>>().Value;
+builder.Services.AddApplicationInsightsTelemetry(appInsightsSettings.ConnectionString);
+
+//Configure logging
+builder.Logging.AddApplicationInsights(
+    configureTelemetryConfiguration: (config) => 
+        config.ConnectionString = appInsightsSettings.ConnectionString,
+    configureApplicationInsightsLoggerOptions: (options) => { }
+);
+
+builder.Logging.AddFilter<ApplicationInsightsLoggerProvider>("", LogLevel.Trace);
+
 
 // Add Services
 builder.Services.AddSingleton<IProfileStorage, CosmosProfileStorage>();

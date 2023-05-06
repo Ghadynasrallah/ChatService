@@ -221,7 +221,7 @@ public class ConversationControllerTest :  IClassFixture<WebApplicationFactory<P
     {
         //Setup
         var sendMessageRequest = new SendMessageRequest(_message1.MessageId, _message1.SenderUsername, _message1.Text);
-        var participants = new []{"foo", "bar"};
+        var participants = new []{null, "bar"};
         var startConversationRequest = new AddConversationRequest(participants, sendMessageRequest);
         _conversationServiceMock.Setup(m => m.StartConversation(It.IsAny<AddConversationRequest>()))
             .ThrowsAsync(new ArgumentException());
