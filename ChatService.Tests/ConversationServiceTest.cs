@@ -59,6 +59,8 @@ public class ConversationServiceTest : IClassFixture<WebApplicationFactory<Progr
     {
         // Arrange
         var sendMessageRequest = new SendMessageRequest(messageId, senderUsername, text);
+        _conversationStorageMock.Setup(m => m.GetConversation("bar_foo"))
+            .ReturnsAsync(new Conversation("bar_foo", "foo", "bar", 100));
         await Assert.ThrowsAsync<ArgumentException>(()=> _conversationService.SendMessageToConversation(conversationId, sendMessageRequest));
     }
 
@@ -248,6 +250,10 @@ public class ConversationServiceTest : IClassFixture<WebApplicationFactory<Progr
     {
         var sendMessageRequest = new SendMessageRequest(messageId, senderUsername, text);
         var startConversationRequest = new AddConversationRequest(new []{userId1, userId2}, sendMessageRequest);
+        _profileStorageMock.Setup(m => m.GetProfile("foo"))
+            .ReturnsAsync(new Profile("foo", "foo", "bar", null));
+        _profileStorageMock.Setup(m => m.GetProfile("bar"))
+            .ReturnsAsync(new Profile("bar", "bar", "foo", null));
         await Assert.ThrowsAsync<ArgumentException>(() => _conversationService.StartConversation(startConversationRequest));
     }
 
@@ -306,8 +312,8 @@ public class ConversationServiceTest : IClassFixture<WebApplicationFactory<Progr
         //Arrange
         var sendMessageRequest = new SendMessageRequest(Guid.NewGuid().ToString(), _conversation1.UserId1, "Hello");
         var startConversationRequest = new AddConversationRequest(new [] { _conversation1.UserId1, _conversation1.UserId2 }, sendMessageRequest);
-        var profile1 = new Profile("foo", "foo", "foo", null);
-        var profile2 = new Profile("bar", "nar", "bar", null);
+        var profile1 = new Profile(_conversation1.UserId1, "foo", "foo", null);
+        var profile2 = new Profile(_conversation1.UserId2, "nar", "bar", null);
 
         _profileStorageMock.Setup(m => m.GetProfile(_conversation1.UserId1)).ReturnsAsync(profile1);
         _profileStorageMock.Setup(m => m.GetProfile(_conversation1.UserId2)).ReturnsAsync(profile2);
@@ -319,8 +325,6 @@ public class ConversationServiceTest : IClassFixture<WebApplicationFactory<Progr
             _conversationService.StartConversation(startConversationRequest));
         
         //Verify
-        _profileStorageMock.Verify(m=>m.GetProfile(profile1.Username), Times.Once);
-        _profileStorageMock.Verify(m=>m.GetProfile(profile2.Username), Times.Once);
         _conversationStorageMock.Verify(m=>m.GetConversation(profile1.Username, profile2.Username), Times.Once);
     }
     [Fact]

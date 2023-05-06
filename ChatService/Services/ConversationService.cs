@@ -20,36 +20,8 @@ public class ConversationService : IConversationService
 
     public async Task<Message> SendMessageToConversation(string conversationId, SendMessageRequest sendMessageRequest)
     {
-        if (String.IsNullOrWhiteSpace(conversationId))
-        {
-            throw new ArgumentException($"Invalid conversation ID {conversationId}");
-        }
-        if (String.IsNullOrWhiteSpace(sendMessageRequest.Text) ||
-            String.IsNullOrWhiteSpace(sendMessageRequest.SenderUsername) ||
-            String.IsNullOrWhiteSpace(sendMessageRequest.Id))
-        {
-            throw new ArgumentException($"Invalid message {sendMessageRequest}", nameof(sendMessageRequest));
-        }
-
-        var conversation = await _conversationStorage.GetConversation(conversationId);
-        if (conversation == null)
-        {
-            throw new ConversationNotFoundException($"There exists no conversation with ID {conversationId}");
-        }
-
-        if (sendMessageRequest.SenderUsername != conversation.UserId1 &&
-            sendMessageRequest.SenderUsername != conversation.UserId2)
-        {
-            throw new SenderNotParticipantException(
-                $"The sender with username {sendMessageRequest.SenderUsername} is not a participant of the conversation with ID {conversationId}");
-        }
-        
-        if (await _messageStorage.GetMessage(conversationId, sendMessageRequest.Id) != null)
-        {
-            throw new MessageConflictException(
-                $"There already exists a message with id {sendMessageRequest.Id} in conversation {conversationId}");
-        }
-        
+        var conversation = await ValidateConversation(conversationId);
+        await ValidateSendMessage(conversation, sendMessageRequest);
         var message = new Message(
             sendMessageRequest.Id,
             sendMessageRequest.Text,
@@ -57,7 +29,6 @@ public class ConversationService : IConversationService
             conversationId,
             DateTimeOffset.UtcNow.ToUnixTimeSeconds()
         );
-        
         await _messageStorage.PostMessageToConversation(message);
         await _conversationStorage.UpsertConversation(new PostConversationRequest(conversation.UserId1,
             conversation.UserId2, message.UnixTime));
@@ -70,14 +41,7 @@ public class ConversationService : IConversationService
         int? limit = null,
         long? lastSeenMessageTime = null)
     {
-        if (String.IsNullOrWhiteSpace(conversationId))
-        {
-            throw new ArgumentException($"Invalid conversation ID {conversationId}");
-        }
-        if (await _conversationStorage.GetConversation(conversationId) == null)
-        {
-            throw new ConversationNotFoundException($"There exists no conversation with ID {conversationId}");
-        }
+        await ValidateConversation(conversationId);
         var response = await _messageStorage.EnumerateMessagesFromAGivenConversation(conversationId,
             continuationToken, limit, lastSeenMessageTime);
         
@@ -91,47 +55,20 @@ public class ConversationService : IConversationService
 
     public async Task<AddConversationResponse> StartConversation(AddConversationRequest startConversationRequest)
     {
-        if (startConversationRequest.Participants.Length != 2)
-        {
-            throw new ArgumentException("There must be 2 participants");
-        }
+        await ValidateAddNewConversation(startConversationRequest);
+        
         var userId1 = startConversationRequest.Participants[0];
         var userId2 = startConversationRequest.Participants[1];
         var sendMessageRequest = startConversationRequest.FirstMessage;
-        if (String.IsNullOrWhiteSpace(userId1) ||
-            String.IsNullOrWhiteSpace(userId2))
-        {
-            throw new ArgumentException("Invalid user ID");
-        }
-        if (String.IsNullOrWhiteSpace(sendMessageRequest.Text) ||
-            String.IsNullOrWhiteSpace(sendMessageRequest.SenderUsername) ||
-            String.IsNullOrWhiteSpace(sendMessageRequest.Id))
-        {
-            throw new ArgumentException($"Invalid message arguments {sendMessageRequest}", nameof(sendMessageRequest));
-        }
 
-        if (await _profileStorage.GetProfile(userId1) == null)
-        {
-            throw new UserNotFoundException($"The user with username {userId1} was not found");
-        }
-        if (await _profileStorage.GetProfile(userId2) == null)
-        {
-            throw new UserNotFoundException($"The user with username {userId2} was not found");
-        }
-        
-        if (sendMessageRequest.SenderUsername != startConversationRequest.Participants[0] &&
-            sendMessageRequest.SenderUsername != startConversationRequest.Participants[1])
-        {
-            throw new SenderNotParticipantException(
-                $"The sender with username {sendMessageRequest.SenderUsername} is not a participant");
-        }
+        await ValidateUserProfile(userId1);
+        await ValidateUserProfile(userId2);
 
-        var conversation = new PostConversationRequest(userId1, userId2, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
-        if (await _conversationStorage.GetConversation(conversation.UserId1, conversation.UserId2) != null) {
-            throw new ConversationConflictException($"There already exists a conversation between {userId1} and {userId2}");
-        }
-        string conversationId = await _conversationStorage.UpsertConversation(conversation);
+        var postConversation = new PostConversationRequest(userId1, userId2, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        string conversationId = await _conversationStorage.UpsertConversation(postConversation);
+        var conversation = new Conversation(conversationId, userId1, userId2, postConversation.LastModifiedUnixTime);
         
+        await ValidateSendMessage(conversation, sendMessageRequest);
         var message = new Message(
             sendMessageRequest.Id,
             sendMessageRequest.Text,
@@ -149,15 +86,7 @@ public class ConversationService : IConversationService
         int? limit = null,
         long? lastSeenConversationTime = null)
     {
-        if (string.IsNullOrWhiteSpace(userId))
-        {
-            throw new ArgumentException($"Invalid user ID");
-        }
-
-        if (await _profileStorage.GetProfile(userId) == null)
-        {
-            throw new UserNotFoundException($"The user with username {userId} was not found");
-        }
+        await ValidateUserProfile(userId);
         var response =
             await _conversationStorage.EnumerateConversationsForAGivenUser(userId, continuationToken, limit,
                 lastSeenConversationTime);
@@ -189,5 +118,70 @@ public class ConversationService : IConversationService
     private static ListMessageResponseItem ToMessageResponse(Message message)
     {
         return new ListMessageResponseItem(message.Text, message.SenderUsername, message.UnixTime);
+    }
+
+    private async Task ValidateSendMessage(Conversation conversation, SendMessageRequest sendMessageRequest)
+    {
+        if (String.IsNullOrWhiteSpace(sendMessageRequest.Text) ||
+            String.IsNullOrWhiteSpace(sendMessageRequest.SenderUsername) ||
+            String.IsNullOrWhiteSpace(sendMessageRequest.Id))
+        {
+            throw new ArgumentException($"Invalid message {sendMessageRequest}", nameof(sendMessageRequest));
+        }
+        if (sendMessageRequest.SenderUsername != conversation.UserId1 &&
+            sendMessageRequest.SenderUsername != conversation.UserId2)
+        {
+            throw new SenderNotParticipantException(
+                $"The sender with username {sendMessageRequest.SenderUsername} is not a participant of the conversation with ID {conversation.ConversationId}");
+        }
+        if (await _messageStorage.GetMessage(conversation.ConversationId, sendMessageRequest.Id) != null)
+        {
+            throw new MessageConflictException(
+                $"There already exists a message with id {sendMessageRequest.Id} in conversation {conversation.ConversationId}");
+        }
+    }
+
+    private async Task<Conversation> ValidateConversation(string conversationId)
+    {
+        if (String.IsNullOrWhiteSpace(conversationId))
+        {
+            throw new ArgumentException($"Invalid conversation ID {conversationId}");
+        }
+        var conversation = await _conversationStorage.GetConversation(conversationId);
+        if (conversation == null)
+        {
+            throw new ConversationNotFoundException($"There exists no conversation with ID {conversationId}");
+        }
+        return conversation;
+    }
+
+    private async Task<Profile> ValidateUserProfile(string username)
+    {
+        if (String.IsNullOrWhiteSpace(username))
+        {
+            throw new ArgumentException("Invalid username: username cannot be null or empty");
+        }
+
+        var profile = await _profileStorage.GetProfile(username);
+        if (profile == null)
+        {
+            throw new UserNotFoundException($"The user with username {username} was not found");
+        }
+        return profile;
+    }
+
+    private async Task ValidateAddNewConversation(AddConversationRequest addConversationRequest)
+    {
+        if (addConversationRequest.Participants.Length != 2)
+        {
+            throw new ArgumentException("There must be 2 participants");
+        }
+
+        string userId1 = addConversationRequest.Participants[0];
+        string userId2 = addConversationRequest.Participants[1];
+        var conversation = await _conversationStorage.GetConversation(userId1, userId2);
+        if (conversation != null) {
+            throw new ConversationConflictException($"There already exists a conversation between {userId1} and {userId2}");
+        }
     }
 }
