@@ -37,7 +37,7 @@ public class UserControllerTest : IClassFixture<WebApplicationFactory<Program>>
         var json = await response.Content.ReadAsStringAsync();
         Assert.Equal(profile, JsonConvert.DeserializeObject<Profile>(json));
 
-        //_profileStorageMock.Verify(m => m.GetProfile(profile.Username), Times.Once);
+        _profileStorageMock.Verify(m => m.GetProfile(profile.username), Times.Once);
 
     }
 

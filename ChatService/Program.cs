@@ -20,6 +20,8 @@ builder.Services.Configure<AzureBlobSettings>(builder.Configuration.GetSection("
 // Add Services
 builder.Services.AddSingleton<IProfileStorage, CosmosProfileStorage>();
 builder.Services.AddSingleton<IProfilePictureStorage, CloudBlobProfilePictureStorage>();
+builder.Services.AddSingleton<IConversationStorage, CosmosConversationStorage>();
+builder.Services.AddSingleton<IMessageStorage, CosmosMessageStorage>();
 
 builder.Services.AddSingleton(sp =>
 {
