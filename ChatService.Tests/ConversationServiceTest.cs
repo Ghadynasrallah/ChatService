@@ -193,10 +193,11 @@ public class ConversationServiceTest : IClassFixture<WebApplicationFactory<Progr
         _conversationStorageMock.Setup(m => m.GetConversation(_conversation1.ConversationId))
             .ReturnsAsync(_conversation1);
         _messageStorageMock.Setup(m=>m.EnumerateMessagesFromAGivenConversation(_conversation1.ConversationId, null, null, null))
-            .ReturnsAsync((ListMessagesStorageResponseDto?)null);
-
-        await Assert.ThrowsAsync<MessageNotFoundException>(() =>
-            _conversationService.EnumerateMessagesInAConversation(_conversation1.ConversationId));
+            .ReturnsAsync(new ListMessagesStorageResponseDto(new List<Message>()));
+        var expectedResult = new ListMessageServiceResponseDto(new List<ListMessageResponseItem>());
+        var actualResult = await _conversationService.EnumerateMessagesInAConversation(_conversation1.ConversationId);
+        Assert.Equal(expectedResult.ContinuationToken, actualResult.ContinuationToken);
+        Assert.Equal(expectedResult.Messages, actualResult.Messages);
     }
     
     [Fact]
@@ -377,9 +378,10 @@ public class ConversationServiceTest : IClassFixture<WebApplicationFactory<Progr
         var profile1 = new Profile(_conversation1.UserId1, _conversation1.UserId1, _conversation1.UserId1, null);
         _profileStorageMock.Setup(m => m.GetProfile(profile1.Username)).ReturnsAsync(profile1);
         _conversationStorageMock.Setup(m => m.EnumerateConversationsForAGivenUser(profile1.Username, null, null, null))
-            .ReturnsAsync((ListConversationsStorageResponse?)null);
-
-        await Assert.ThrowsAsync<ConversationNotFoundException>(() =>
-            _conversationService.EnumerateConversationsOfAGivenUser(profile1.Username));
+            .ReturnsAsync(new ListConversationsStorageResponse(new List<Conversation>()));
+        var expectedResult = new ListConversationsServiceResponse(new List<ListConversationsResponseItem>());
+        var actualResult = await _conversationService.EnumerateConversationsOfAGivenUser(profile1.Username);
+        Assert.Equal(expectedResult.Conversations, actualResult.Conversations);
+        Assert.Equal(expectedResult.ContinuationToken, actualResult.ContinuationToken);
     }
 }

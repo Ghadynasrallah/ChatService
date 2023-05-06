@@ -80,10 +80,6 @@ public class ConversationController : ControllerBase
         {
             return NotFound($"There exists no conversation with ID {conversationId}");
         }
-        catch (MessageNotFoundException)
-        {
-            return Ok(new ListMessageResponse(new List<ListMessageResponseItem>()));
-        }
     }
 
     [HttpPost]
@@ -146,10 +142,6 @@ public class ConversationController : ControllerBase
         catch (ArgumentException)
         {
             return BadRequest($"Invalid user ID");
-        }
-        catch (ConversationNotFoundException)
-        {
-            return Ok(new ListConversationsResponse(new List<ListConversationsResponseItem>()));
         }
         catch (UserNotFoundException)
         {

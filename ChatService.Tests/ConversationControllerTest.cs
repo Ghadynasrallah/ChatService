@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Newtonsoft.Json;
+using ListMessageResponseItem = ChatService.Dtos.ListMessageResponseItem;
 
 namespace ChatService.Tests;
 
@@ -159,7 +160,7 @@ public class ConversationControllerTest :  IClassFixture<WebApplicationFactory<P
     public async Task EnumerateMessages_NoMessagesFound()
     {
         _conversationServiceMock.Setup(m => m.EnumerateMessagesInAConversation(_conversation1.ConversationId, null, null, null))
-            .ThrowsAsync(new MessageNotFoundException());
+            .ReturnsAsync(new ListMessageServiceResponseDto(new List<ListMessageResponseItem>()));
         var response = await _httpClient.GetAsync($"api/conversations/{_conversation1.ConversationId}/messages");
         var json = await response.Content.ReadAsStringAsync();
         var listMessageResponse = JsonConvert.DeserializeObject<ListMessageResponse>(json);
@@ -367,7 +368,7 @@ public class ConversationControllerTest :  IClassFixture<WebApplicationFactory<P
     {
         //Setup
         _conversationServiceMock.Setup(m => m.EnumerateConversationsOfAGivenUser("foo", null, null, null))
-            .ThrowsAsync(new ConversationNotFoundException());
+            .ReturnsAsync(new ListConversationsServiceResponse(new List<ListConversationsResponseItem>()));
         
         //Act
         var response = await _httpClient.GetAsync("api/conversations?username=foo");

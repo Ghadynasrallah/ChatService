@@ -80,11 +80,7 @@ public class ConversationService : IConversationService
         }
         var response = await _messageStorage.EnumerateMessagesFromAGivenConversation(conversationId,
             continuationToken, limit, lastSeenMessageTime);
-        if (response == null)
-        {
-            throw new MessageNotFoundException(
-                $"There are no messages for the conversation with conversation ID {conversationId}");
-        }
+        
         List<ListMessageResponseItem> messagesResult = new List<ListMessageResponseItem>();
         foreach (var message in response.Messages)
         {
@@ -165,10 +161,6 @@ public class ConversationService : IConversationService
         var response =
             await _conversationStorage.EnumerateConversationsForAGivenUser(userId, continuationToken, limit,
                 lastSeenConversationTime);
-        if (response == null)
-        {
-            throw new ConversationNotFoundException($"There exists no conversations for the user with ID {userId}");
-        }
 
         var conversations = response.Conversations;
         List<ListConversationsResponseItem> userConversations = new List<ListConversationsResponseItem>();
