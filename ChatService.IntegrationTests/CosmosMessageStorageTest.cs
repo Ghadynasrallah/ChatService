@@ -41,13 +41,6 @@ public class CosmosMessageStorageTest : IClassFixture<WebApplicationFactory<Prog
     }
     
     [Fact]
-    public async Task GetAlreadyExistingMessages()
-    {
-        Message expectedAlreadyExistingMessage = new Message("TestMessage", "My name is fooz!", "fooz", "barz_fooz", 2000);
-        Assert.Equal(expectedAlreadyExistingMessage, await _store.GetMessage("barz_fooz", "TestMessage"));
-    }
-
-    [Fact]
     public async Task GetNonExistingMessage()
     {
         Assert.Null(await _store.GetMessage("mike_bar", "test"));

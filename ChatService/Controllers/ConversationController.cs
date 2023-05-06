@@ -1,8 +1,10 @@
+using System.Diagnostics;
 using System.Text;
 using ChatService.Dtos;
 using ChatService.Exceptions;
 using ChatService.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.ApplicationInsights;
 
 namespace ChatService.Controllers;
 
@@ -12,10 +14,16 @@ public class ConversationController : ControllerBase
 {
     private readonly IConversationService _conversationService;
     private readonly ILogger<ConversationController> _logger;
-    public ConversationController(IConversationService conversationService, ILogger<ConversationController> logger)
+    private readonly TelemetryClient _telemetryClient;
+
+    public ConversationController(
+        IConversationService conversationService,
+        ILogger<ConversationController> logger,
+        TelemetryClient telemetryClient)
     {
         _conversationService = conversationService;
         _logger = logger;
+        _telemetryClient = telemetryClient;
     }
 
     [HttpPost("{conversationId}/messages")]
@@ -29,10 +37,13 @@ public class ConversationController : ControllerBase
         {
             try
             {
+                var stopWatch = Stopwatch.StartNew();
                 var message = await _conversationService.SendMessageToConversation(conversationId, sendMessageRequest);
                 _logger.LogInformation(
                     "Message sent successfully. Conversation ID: {ConversationId}, Message ID: {MessageId}",
                     conversationId, message.MessageId);
+                _telemetryClient.TrackEvent("MessageSent");
+                _telemetryClient.TrackMetric("MessageStore.SendMessage.Time", stopWatch.ElapsedMilliseconds);
                 return CreatedAtAction(nameof(EnumerateMessagesInAConversation),
                     new { conversationId = message.ConversationId },
                     new SendMessageResponse(message.UnixTime));
@@ -63,12 +74,6 @@ public class ConversationController : ControllerBase
                 return BadRequest(
                     $"The sender with username {sendMessageRequest.SenderUsername} is not a participant of the conversation with ID {conversationId}");
             }
-            catch
-            {
-                _logger.LogError("There was an error sending the message with id {MessageId} to conversation {ConversationId}",
-                    sendMessageRequest.Id, conversationId);
-                throw;
-            }
         }
     }
 
@@ -83,6 +88,7 @@ public class ConversationController : ControllerBase
         {
             try
             {
+                var stopWatch = Stopwatch.StartNew();
                 string? decodedContinuationToken = null;
                 if (continuationToken != null)
                 {
@@ -99,6 +105,7 @@ public class ConversationController : ControllerBase
                         $"api/conversations/{conversationId}/messages?lastSeenMessageTime={lastSeenMessageTime}&limit={limit}&continuationToken={encodedContinuationToken}";
                 }
                 _logger.LogInformation("Messages enumerated successfully for conversation: {ConversationId}", conversationId);
+                _telemetryClient.TrackMetric("MessageStore.EnumerateMessages.Time", stopWatch.ElapsedMilliseconds);
                 return Ok(new ListMessageResponse(messagesStorageResponseDto.Messages, nextUri));
             }
             catch (ArgumentException)
@@ -110,11 +117,6 @@ public class ConversationController : ControllerBase
             {
                 _logger.LogWarning("Conversation not found: {ConversationId}", conversationId);
                 return NotFound($"There exists no conversation with ID {conversationId}");
-            }
-            catch
-            {
-                _logger.LogError("An error occurred while enumerating messages for conversation: {ConversationId}", conversationId);
-                throw; 
             }
         }
     }
@@ -133,10 +135,13 @@ public class ConversationController : ControllerBase
         {
             try
             {
+                var stopWatch = Stopwatch.StartNew();
                 var startConversationResponse =
                     await _conversationService.StartConversation(startConversationRequest);
                 _logger.LogInformation("Conversation started successfully. Conversation ID: {ConversationId}",
                     startConversationResponse.Id);
+                _telemetryClient.TrackEvent("ConversationAdded");
+                _telemetryClient.TrackMetric("ConversationStore.StartConversation.Time", stopWatch.ElapsedMilliseconds);
                 return CreatedAtAction(nameof(EnumerateConversationsOfAGivenUser),
                     new { userId = startConversationResponse.Participants[0] },
                     startConversationResponse);
@@ -163,11 +168,6 @@ public class ConversationController : ControllerBase
                 return BadRequest(
                     $"The sender with username {startConversationRequest.FirstMessage.SenderUsername} is not a participant");
             }
-            catch
-            {
-                _logger.LogError("There was an error starting the conversation {AddConversationRequest}", startConversationRequest);
-                throw;
-            }
         }
     }
 
@@ -182,6 +182,7 @@ public class ConversationController : ControllerBase
         {
             try
             {
+                var stopWatch = Stopwatch.StartNew();
                 string? decodedContinuationToken = null;
                 if (continuationToken != null)
                 {
@@ -201,6 +202,7 @@ public class ConversationController : ControllerBase
                         $"api/conversations?username={username}&limit={limit}&lastSeenConversationTime={lastSeenConversationTime}&continuationToken={encodedContinuationToken}";
                 }
                 _logger.LogInformation("Conversations enumerated successfully for user: {Username}", username);
+                _telemetryClient.TrackMetric("ConversationStore.EnumerateConversations.Time", stopWatch.ElapsedMilliseconds);
                 return Ok(new ListConversationsResponse(conversationsStorageResponseDto.Conversations,
                     nextUri));
             }
@@ -213,11 +215,6 @@ public class ConversationController : ControllerBase
             {
                 _logger.LogWarning("User not found: {Username}", username);
                 return NotFound($"The user with username {username} was not found");
-            } 
-            catch 
-            {
-                _logger.LogError( "An error occurred while enumerating conversations for user: {Username}", username);
-                throw; 
             }
         }
     }

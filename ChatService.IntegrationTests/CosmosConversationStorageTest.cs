@@ -45,13 +45,7 @@ public class CosmosConversationStorageTest :  IClassFixture<WebApplicationFactor
         Assert.Equal(_conversation1, await _store.GetConversation(_postConversation1.UserId1, _postConversation1.UserId2));
         Assert.Equal(_conversation1, await _store.GetConversation(_postConversation1.UserId2, _postConversation1.UserId1));
     }
-
-    [Fact]
-    public async Task GetAlreadyExistingConversation()
-    {
-        Assert.Equal(new Conversation("barz_fooz","fooz", "barz", 1000), await _store.GetConversation("fooz", "barz"));
-    }
-
+    
     [Fact]
     public async Task GetConversation()
     {

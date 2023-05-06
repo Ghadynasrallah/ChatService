@@ -4,8 +4,6 @@ using ChatService.Configuration;
 using ChatService.Storage;
 using Azure.Storage.Blobs;
 using ChatService.Services;
-using Microsoft.Azure.Storage;
-using Microsoft.Azure.Storage.Blob;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,6 +15,9 @@ builder.Services.AddSwaggerGen();
 // Add Configuration
 builder.Services.Configure<CosmosSettings>(builder.Configuration.GetSection("Cosmos"));
 builder.Services.Configure<AzureBlobSettings>(builder.Configuration.GetSection("AzureBlob"));
+
+// The following line enables Application Insights telemetry collection.
+builder.Services.AddApplicationInsightsTelemetry();
 
 // Add Services
 builder.Services.AddSingleton<IProfileStorage, CosmosProfileStorage>();
