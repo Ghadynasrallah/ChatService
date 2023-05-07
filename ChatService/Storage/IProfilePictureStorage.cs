@@ -4,9 +4,9 @@ namespace ChatService.Storage;
 
 public interface IProfilePictureStorage
 {
-    Task<string> UploadImage(Stream profilePictureData);
+    Task UploadImage(string imageId, Stream profilePictureData);
     
-    Task<Stream?> DownloadImage(string profilePictureId);
+    Task<Stream?> DownloadImage(string imageId);
 
-    Task DeleteImage(string profilePictureId);
+    Task DeleteImage(string imageId);
 }

@@ -1,8 +1,8 @@
-using System.Drawing;
 using System.Net;
+using System.Text;
 using ChatService.Dtos;
-using ChatService.Storage;
-using Microsoft.AspNetCore.Mvc;
+using ChatService.Exceptions;
+using ChatService.Services;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,23 +14,22 @@ namespace ChatService.Tests;
 
 public class ImageControllerTest : IClassFixture<WebApplicationFactory<Program>>
 {
-    private readonly Mock<IProfilePictureStorage> _profilePictureStorageMock = new();
+    private readonly Mock<IImageService> _imageServiceMock = new();
     private readonly HttpClient _httpClient;
-    private readonly MemoryStream EmptyStream = new MemoryStream(new byte[0]);
-    private readonly MemoryStream ImageStream = new MemoryStream(File.ReadAllBytes(@"/Users/ghady/RiderProjects/TestImage.jpg"));
+    private readonly MemoryStream _testStream = new MemoryStream(Encoding.UTF8.GetBytes("Hello world!"));
 
     public ImageControllerTest(WebApplicationFactory<Program> factory)
     {
         _httpClient = factory.WithWebHostBuilder(builder =>
         {
-            builder.ConfigureTestServices(services => { services.AddSingleton(_profilePictureStorageMock.Object); });
+            builder.ConfigureTestServices(services => { services.AddSingleton(_imageServiceMock.Object); });
         }).CreateClient();
     }
 
     [Fact]
     public async Task UploadValidImage()
     {
-        HttpContent fileStreamContent = new StreamContent(ImageStream);
+        HttpContent fileStreamContent = new StreamContent(_testStream);
         fileStreamContent.Headers.ContentDisposition = new ContentDispositionHeaderValue("form-data")
         {
             Name = "file",
@@ -40,55 +39,73 @@ public class ImageControllerTest : IClassFixture<WebApplicationFactory<Program>>
         formData.Add(fileStreamContent);
 
         var guid = Guid.NewGuid().ToString();
-        _profilePictureStorageMock.Setup(m => m.UploadImage(It.IsAny<Stream>()))
-            .ReturnsAsync(guid);
+        _imageServiceMock.Setup(m => m.UploadImage(It.IsAny<Stream>())).ReturnsAsync(guid);
 
-        var response = await _httpClient.PostAsync("Image", formData);
+        var response = await _httpClient.PostAsync("api/images", formData);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         var json = await response.Content.ReadAsStringAsync();
 
-        Assert.Equal(guid, JsonConvert.DeserializeObject<UploadImageResponse>(json).imageId);
+        Assert.Equal(guid, JsonConvert.DeserializeObject<UploadImageResponse>(json).ImageId);
 
-        _profilePictureStorageMock.Verify(m=> m.UploadImage(It.IsAny<Stream>()), Times.Once);
+        _imageServiceMock.Verify(m=> m.UploadImage(It.IsAny<Stream>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task UploadImage_BadRequest()
+    {
+        HttpContent fileStreamContent = new StreamContent(_testStream);
+        fileStreamContent.Headers.ContentDisposition = new ContentDispositionHeaderValue("form-data")
+        {
+            Name = "file",
+            FileName = "Image"
+        };
+        using var formData = new MultipartFormDataContent();
+        formData.Add(fileStreamContent);
+
+        var guid = Guid.NewGuid().ToString();
+        _imageServiceMock.Setup(m => m.UploadImage(It.IsAny<Stream>())).ThrowsAsync(new ArgumentException());
+        
+        var response = await _httpClient.PostAsync("api/images", formData);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
     public async Task DownloadValidImage()
     {
         var guid = Guid.NewGuid().ToString();
-        ImageStream.Position = 0;
-        _profilePictureStorageMock.Setup(m => m.DownloadImage(guid))
-            .ReturnsAsync(ImageStream);
+        _testStream.Position = 0;
+        _imageServiceMock.Setup(m => m.DownloadImage(guid))
+            .ReturnsAsync(_testStream);
 
-        var response = await _httpClient.GetAsync($"Image/{guid}");
+        var expectedData = _testStream.ToArray();
+
+        // Act
+        var response = await _httpClient.GetAsync($"api/images/{guid}");
+
+        // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var responseContent = await response.Content.ReadAsByteArrayAsync();
+        Assert.Equal(expectedData, responseContent);
+        _imageServiceMock.Verify(m => m.DownloadImage(guid), Times.Once);
+    }
+    
+    [Fact]
+    public async Task DownloadImage_NotFound()
+    {
+        var guid = Guid.NewGuid().ToString();
+        _imageServiceMock.Setup(m => m.DownloadImage(guid)).ThrowsAsync(new ImageNotFoundException());
 
-        _profilePictureStorageMock.Verify(m =>m.DownloadImage(guid));
-        
-        var responseContent = new FileContentResult(await response.Content.ReadAsByteArrayAsync(), "image/jpeg");
-        var expectedContent = new FileContentResult(ImageStream.ToArray(), "image/jpeg");
-        
-        Assert.Equal(expectedContent.FileContents, responseContent.FileContents);
-        
-        /*
-         //Only if the controller returns the ImageStream as is
-        var outputStream = response.Content.ReadAsStream();
-        var OutputMemoryStream = new MemoryStream();
-        outputStream.CopyTo(OutputMemoryStream);
-        Assert.Equal(ImageStream.ToArray(), OutputMemoryStream.ToArray());
-        */
-        
+        var response = await _httpClient.GetAsync($"api/images/{guid}");
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]
-    public async Task DownloadNonValidImage()
+    public async Task DownloadImage_BadRequest()
     {
-        var guid = Guid.NewGuid().ToString();
-        _profilePictureStorageMock.Setup(m => m.DownloadImage(guid))
-            .ReturnsAsync((Stream)null);
-        
-        var response = await _httpClient.GetAsync($"Image/{guid}");
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        string id = "test";
+        _imageServiceMock.Setup(m => m.DownloadImage(id)).ThrowsAsync(new ArgumentException());
+        var response = await _httpClient.GetAsync($"api/images/{id}");
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 }

@@ -2,4 +2,4 @@ using System.ComponentModel.DataAnnotations;
 
 namespace ChatService.Dtos;
 
-public record SendMessageResponse([Required] long createdUnixTime);
+public record SendMessageResponse([Required] long CreatedUnixTime);

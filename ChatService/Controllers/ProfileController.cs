@@ -1,76 +1,105 @@
+using System.Diagnostics;
 using ChatService.Dtos;
-using ChatService.Storage;
+using ChatService.Exceptions;
+using ChatService.Services;
+using Microsoft.ApplicationInsights;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Azure.Cosmos;
 using ArgumentException = System.ArgumentException;
 
 namespace ChatService.Controllers;
 
 [ApiController]
-[Route("[Controller]")]
+[Route("api/profile")]
 public class ProfileController : ControllerBase
 {
-    private readonly IProfileStorage _profileStorage;
+    private readonly IProfileService _profileService;
+    private readonly ILogger<ProfileController> _logger;
+    private readonly TelemetryClient _telemetryClient;
 
-    public ProfileController(IProfileStorage profileStorage)
+    public ProfileController(IProfileService profileService, ILogger<ProfileController> logger, TelemetryClient telemetryClient)
     {
-        _profileStorage = profileStorage;
+        _profileService = profileService;
+        _logger = logger;
+        _telemetryClient = telemetryClient;
     }
 
     [HttpGet("{username}")]
     public async Task<ActionResult<Profile>> GetProfile([FromRoute] string username)
     {
-        var profile = await _profileStorage.GetProfile(username);
-        if (profile == null)
+        using (_logger.BeginScope("{Username}", username))
         {
-            return NotFound($"A user with username {username} was not found");
+            try
+            {
+                var stopWatch = Stopwatch.StartNew();
+                var profile = await _profileService.GetProfile(username);
+                _logger.LogInformation("Profile retrieved successfully. User ID: {ProfileUsername}", username);
+                _telemetryClient.TrackMetric("ProfileStore.GetProfile.Time",stopWatch.ElapsedMilliseconds);
+                return Ok(profile);
+            }
+            catch (UserNotFoundException)
+            {
+                _logger.LogWarning("User with id {ProfileUsername} was not found", username);
+                return NotFound($"The user with user ID {username} was not found");
+            }
+            catch (ArgumentException)
+            {
+                _logger.LogWarning("Invalid username: username cannot be null or empty");
+                return BadRequest($"Invalid username: username cannot be null or empty");
+            }
         }
-
-        return Ok(profile);
     }
 
     [HttpPost]
     public async Task<ActionResult<Profile>> AddProfile(Profile profile)
     {
-        try
+        using (_logger.BeginScope("{Username}", profile.Username))
         {
-            var existingProfile = await _profileStorage.GetProfile(profile.username);
-            if (existingProfile != null)
+            try
             {
-                return Conflict($"A user with username {profile.username} already exists");
+                var stopWatch = Stopwatch.StartNew();
+                await _profileService.AddProfile(profile);
+                _logger.LogInformation("Added profile with username {ProfileUsername}", profile.Username);
+                _telemetryClient.TrackEvent("ProfileAdded");
+                _telemetryClient.TrackMetric("ProfileStore.AddProfile.Time", stopWatch.ElapsedMilliseconds);
+                return CreatedAtAction(nameof(GetProfile), new { username = profile.Username }, profile);
             }
-
-            await _profileStorage.UpsertProfile(profile);
-            return CreatedAtAction(nameof(GetProfile), new { username = profile.username }, profile);
-        }
-        catch (ArgumentException)
-        {
-            return BadRequest($"Invalid profile {profile}");
+            catch (ArgumentException)
+            {
+                _logger.LogWarning("Invalid profile arguments {Profile}", profile);
+                return BadRequest($"Invalid profile arguments {profile}");
+            }
+            catch (UserConflictException)
+            {
+                _logger.LogWarning("A user with username {ProfileUsername} already exists", profile.Username);
+                return Conflict($"A user with username {profile.Username} already exists");
+            }
         }
     }
 
     [HttpPut("{username}")]
-    public async Task<ActionResult<Profile>> UpdateProfile(String username, [FromBody] PutProfileRequest putProfile)
+    public async Task<ActionResult<Profile>> UpdateProfile(string username, [FromBody] PutProfileRequest putProfile)
     {
-        try
+        using (_logger.BeginScope("{Username}", username))
         {
-            var existingProfile = await _profileStorage.GetProfile(username);
-            if (existingProfile == null)
+            try
             {
-                return NotFound($"A user with username {username} does not exist");
+                var stopWatch = Stopwatch.StartNew();
+                var updatedProfile = await _profileService.UpdateProfile(username, putProfile);
+                _logger.LogInformation("Updated profile with username {ProfileUsername}", username);
+                _telemetryClient.TrackEvent("ProfileUpdated");
+                _telemetryClient.TrackMetric("ProfileStore.UpdateProfile.Time", stopWatch.ElapsedMilliseconds);
+                return Ok(updatedProfile);
             }
-
-            var updatedProfile = new Profile(username, putProfile.FirstName, putProfile.LastName,
-                putProfile.ProfilePictureId);
-            await _profileStorage.UpsertProfile(updatedProfile);
-            return Ok(updatedProfile);
-        }
-        catch (ArgumentException)
-        {
-            var updatedProfile = new Profile(username, putProfile.FirstName, putProfile.LastName,
-                putProfile.ProfilePictureId);
-            return BadRequest($"Invalid profile {updatedProfile}");
+            catch (ArgumentException)
+            {
+                _logger.LogWarning("Invalid profile arguments {PutProfile}", putProfile);
+                return BadRequest($"Invalid Arguments: Username, FirstName, and LastName cannot be null or empty");
+            }
+            catch (UserNotFoundException)
+            {
+                _logger.LogWarning("The user with username {username} was not found", username);
+                return NotFound($"The user with username {username} was not found");
+            }
         }
     }
-    
 }

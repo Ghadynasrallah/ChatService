@@ -3,8 +3,6 @@ using Microsoft.Azure.Cosmos;
 using ChatService.Dtos;
 using ChatService.Storage.Entities;
 
-
-
 namespace ChatService.Storage;
 
 public class CosmosProfileStorage : IProfileStorage
@@ -20,13 +18,6 @@ public class CosmosProfileStorage : IProfileStorage
     
     public async Task UpsertProfile(Profile profile)
     {
-        if (string.IsNullOrWhiteSpace(profile.username) ||
-            string.IsNullOrWhiteSpace(profile.firstName) ||
-            string.IsNullOrWhiteSpace(profile.lastName))
-        {
-            throw new ArgumentException($"Invalid profile {profile}", nameof(profile));
-        }
-
         await container.UpsertItemAsync(ToEntity(profile));
     }
 
@@ -56,9 +47,13 @@ public class CosmosProfileStorage : IProfileStorage
     { 
         try
         {
-            await container.DeleteItemAsync<Profile>(
+            await container.DeleteItemAsync<ProfileEntity>(
+                id: username,
                 partitionKey: new PartitionKey(username),
-                id: username
+                new ItemRequestOptions
+                {
+                    ConsistencyLevel = ConsistencyLevel.Session
+                }
             );
         }
         catch (CosmosException e)
@@ -67,7 +62,6 @@ public class CosmosProfileStorage : IProfileStorage
             {
                 return;
             }
-
             throw;
         }
     }
@@ -75,20 +69,20 @@ public class CosmosProfileStorage : IProfileStorage
     private static ProfileEntity ToEntity(Profile profile)
     {
         return new ProfileEntity(
-            partitionKey: profile.username,
-            id: profile.username,
-            FirstName:profile.firstName,
-            LastName:profile.lastName,
-            ProfilePictureId: profile.profilePictureId
+            partitionKey: profile.Username,
+            id: profile.Username,
+            FirstName:profile.FirstName,
+            LastName:profile.LastName,
+            ProfilePictureId: profile.ProfilePictureId
             );
     }
 
     private static Profile ToProfile(ProfileEntity profileEntity)
     {
-        return new Profile(username:profileEntity.id, 
-                            firstName:profileEntity.FirstName,
-                            lastName: profileEntity.LastName,
-                            profilePictureId: profileEntity.ProfilePictureId
+        return new Profile(Username:profileEntity.id, 
+                            FirstName:profileEntity.FirstName,
+                            LastName: profileEntity.LastName,
+                            ProfilePictureId: profileEntity.ProfilePictureId
                             );
     }
 }

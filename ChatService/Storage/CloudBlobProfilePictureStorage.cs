@@ -13,39 +13,19 @@ public class CloudBlobProfilePictureStorage : IProfilePictureStorage
     }
 
     private BlobContainerClient _blobContainerClient => _blobServiceClient.GetBlobContainerClient("profile-pictures");
-    public async Task<string> UploadImage(Stream ProfilePicturedata)
+    public async Task UploadImage(string imageId, Stream profilePicturedata)
     {
-        if (ProfilePicturedata.Length == 0)
-        {
-            throw new ArgumentException("Image file is empty");
-        }
-        string guid = Guid.NewGuid().ToString();
-        BlobClient blobClient = _blobContainerClient.GetBlobClient(guid);
-        
-        while (await blobClient.ExistsAsync())
-        {
-            guid = Guid.NewGuid().ToString();
-            blobClient = _blobContainerClient.GetBlobClient(guid);
-        }
-
-        await blobClient.UploadAsync(ProfilePicturedata);
-        return guid;
+        BlobClient blobClient = _blobContainerClient.GetBlobClient(imageId);
+        await blobClient.UploadAsync(profilePicturedata);
     }
 
     public async Task<Stream?> DownloadImage(string profilePictureId)
     {
-        if (String.IsNullOrWhiteSpace(profilePictureId))
-        {
-            throw new ArgumentException("The profile picture ID is invalid: ID does not contain any text");
-        }
-        
         BlobClient blobClient = _blobContainerClient.GetBlobClient(profilePictureId);
-
         if (! await blobClient.ExistsAsync())
         {
             return null;
         }
-
         Stream imageData = new MemoryStream();
         var downloadResponse = await blobClient.DownloadAsync();
         await downloadResponse.Value.Content.CopyToAsync(imageData);
@@ -55,10 +35,6 @@ public class CloudBlobProfilePictureStorage : IProfilePictureStorage
 
     public async Task DeleteImage(string profilePictureId)
     {
-        if (String.IsNullOrWhiteSpace(profilePictureId))
-        {
-            throw new ArgumentException("The profile picture ID is invalid: ID does not contain any text");
-        }
         BlobClient blobClient = _blobContainerClient.GetBlobClient(profilePictureId);
         await blobClient.DeleteIfExistsAsync();
     }

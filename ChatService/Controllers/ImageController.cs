@@ -1,20 +1,25 @@
+using System.Diagnostics;
 using ChatService.Dtos;
-using ChatService.Storage;
+using ChatService.Exceptions;
+using ChatService.Services;
+using Microsoft.ApplicationInsights;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Azure.Cosmos;
-
 
 namespace ChatService.Controllers;
 
 [ApiController]
-[Route("[Controller]")]
+[Route("api/images")]
 public class ImageController : ControllerBase
 {
-    private readonly IProfilePictureStorage _profilePictureStorage;
+    private readonly IImageService _imageService;
+    private readonly ILogger<ImageController> _logger;
+    private readonly TelemetryClient _telemetryClient;
 
-    public ImageController(IProfilePictureStorage profilePictureStorage)
+    public ImageController(IImageService imageService, ILogger<ImageController> logger, TelemetryClient telemetryClient)
     {
-        _profilePictureStorage = profilePictureStorage;
+        _imageService = imageService;
+        _logger = logger;
+        _telemetryClient = telemetryClient;
     }
 
     [HttpPost]
@@ -22,28 +27,47 @@ public class ImageController : ControllerBase
     {
         try
         {
-            var imageId = await _profilePictureStorage.UploadImage(uploadImageRequest.File.OpenReadStream());
+            var stopWatch = Stopwatch.StartNew();
+            var profilePictureData = uploadImageRequest.File.OpenReadStream();
+            var imageId = await _imageService.UploadImage(profilePictureData);
+            _logger.LogInformation("Image uploaded successfully. Image ID: {ImageId}", imageId);
+            _telemetryClient.TrackEvent("ImageUploaded");
+            _telemetryClient.TrackMetric("ImageStore.UploadImage.Time", stopWatch.ElapsedMilliseconds);
             return Ok(new UploadImageResponse(imageId));
         }
         catch (ArgumentException)
         {
-            return BadRequest("The Image file provided is empty");
+            _logger.LogWarning("Image file is empty");
+            return BadRequest("The Image file is empty");
         }
     }
 
-    [HttpGet("{id}")]
-    public async Task<ActionResult> DownloadImage([FromRoute] string id)
+    [HttpGet("{imageId}")]
+    public async Task<ActionResult> DownloadImage([FromRoute] string imageId)
     {
-        var imageData = await _profilePictureStorage.DownloadImage(id);
-        
-        if (imageData == null)
+        using (_logger.BeginScope("{ImageId}", imageId))
         {
-            return NotFound($"The image with id {id} was not found");
+            try
+            {
+                var stopWatch = Stopwatch.StartNew();
+                var imageData = await _imageService.DownloadImage(imageId);
+                var imageMemoryStream = new MemoryStream();
+                await imageData.CopyToAsync(imageMemoryStream);
+                imageMemoryStream.Position = 0;
+                _logger.LogInformation("Image downloaded successfully. Image Id: {ImageId}", imageId);
+                _telemetryClient.TrackMetric("ImageStore.DownloadImage.Time", stopWatch.ElapsedMilliseconds);
+                return new FileContentResult(imageMemoryStream.ToArray(), "image/jpeg");
+            }
+            catch (ArgumentException)
+            {
+                _logger.LogWarning("Invalid Argument: Image ID cannot be null or empty");
+                return BadRequest("Invalid Argument: Image ID cannot be null or empty");
+            }
+            catch (ImageNotFoundException)
+            {
+                _logger.LogWarning("Image not found. Image Id: {imageId}", imageId);
+                return NotFound($"There exists no image with ID {imageId}");
+            }
         }
-    
-        var imageMemoryStream = new MemoryStream();
-        await imageData.CopyToAsync(imageMemoryStream);
-        imageMemoryStream.Position = 0;
-        return Ok(new FileContentResult(imageMemoryStream.ToArray(), "image/jpeg"));
     }
 }
