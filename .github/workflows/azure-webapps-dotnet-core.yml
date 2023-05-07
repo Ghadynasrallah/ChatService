@@ -28,7 +28,6 @@ on:
   push:
     branches:
       - main
-      - ChattingNewFeatures
       
   workflow_dispatch:
 
@@ -52,6 +51,12 @@ jobs:
 
       - name: Build with dotnet
         run: dotnet build ./ChatService.sln --configuration Release --no-restore
+
+      - name: Run unit tests
+        run: dotnet test ./ChatService.Tests/ChatService.Tests.csproj --configuration Release
+
+      - name: Run integration tests
+        run: dotnet test ./ChatService.IntegrationTests/ChatService.IntegrationTests.csproj --configuration Release
 
       - name: dotnet publish
         run: dotnet publish ./ChatService.sln -c Release -o ${{ env.AZURE_WEBAPP_PACKAGE_PATH }} --no-build
